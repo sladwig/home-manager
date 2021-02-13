@@ -10,9 +10,11 @@ let
   };
 in
 
+with lib;
+
 {
   options.darwin = {
-    installApps = lib.mkOption {
+    installApps = mkOption {
       default = false;
       example = true;
       description = ''
@@ -20,24 +22,24 @@ in
 
         Note: Disabled by default due to conflicting behavior with nix-darwin. See https://github.com/nix-community/home-manager/issues/1341#issuecomment-687286866
       '';
-      type = lib.types.bool;
+      type = types.bool;
     };
-    fullCopies = lib.mkOption {
+    fullCopies = mkOption {
       default = false;
       example = true;
       description = ''
         Make full copies of the .app dirs instead of symlinking them. This is the only known way of making them show up in vanilla Finder.
       '';
-      type = lib.types.bool;
+      type = types.bool;
     };
   };
 
-  config.home = lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && cfg.installApps) {
+  config.home = mkIf (pkgs.stdenv.hostPlatform.isDarwin && cfg.installApps) {
     # The module system doesn't seem to like ternaries, we need to work with mkIfs.
-    activation = lib.mkIf cfg.fullCopies {
+    activation = mkIf cfg.fullCopies {
       # Can't inline this as `activation.darwinApps`, mkIf with false predicate would
       # try to set darwinApps.data which HM sees as setting a non-existant option
-      darwinApps = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      darwinApps = hm.dag.entryAfter [ "writeBoundary" ] ''
         # Install MacOS applications to the user environment.
         HM_APPS="$HOME/Applications/Home Manager Apps"
 
@@ -54,6 +56,6 @@ in
     };
 
     # Install MacOS applications to the user environment.
-    file."Applications/Home Manager Apps".source = lib.mkIf (!cfg.fullCopies) "${appEnv}/Applications";
+    file."Applications/Home Manager Apps".source = mkIf (!cfg.fullCopies) "${appEnv}/Applications";
   };
 }
