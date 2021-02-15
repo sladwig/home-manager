@@ -56,6 +56,9 @@ with lib;
     };
 
     # Install MacOS applications to the user environment.
-    file."Applications/Home Manager Apps".source = mkIf (!cfg.fullCopies) "${appEnv}/Applications";
+    file."Applications/Home Manager Apps" = mkIf (!cfg.fullCopies) {
+      # Again, we need to work around the HM limitation
+      source = "${appEnv}/Applications";
+    };
   };
 }
