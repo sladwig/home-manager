@@ -50,7 +50,7 @@ with lib;
         # .app dirs need to be actual directories for Finder to detect them as Apps.
         # In the env of Apps we build, the .apps are symlinks. We pass all of them as
         # arguments to cp and make it dereference those using -H
-        $DRY_RUN_CMD cp -a -H --dereference ${appEnv}/Applications/* "$HM_APPS"
+        $DRY_RUN_CMD cp --archive -H --dereference ${appEnv}/Applications/* "$HM_APPS"
         $DRY_RUN_CMD chmod +w -R "$HM_APPS"
       '';
     };
