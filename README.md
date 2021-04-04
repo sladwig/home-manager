@@ -3,8 +3,10 @@ Home Manager using Nix
 
 This project provides a basic system for managing a user environment
 using the [Nix][] package manager together with the Nix libraries
-found in [Nixpkgs][]. Before attempting to use Home Manager please
-read the warning below.
+found in [Nixpkgs][]. It allows declarative configuration of user
+specific (non global) packages and dotfiles.
+
+Before attempting to use Home Manager please read the warning below.
 
 For a more systematic overview of Home Manager and its available
 options, please see the [Home Manager manual][manual].
@@ -12,14 +14,17 @@ options, please see the [Home Manager manual][manual].
 Words of warning
 ----------------
 
-This project is under development. I personally use it to manage
-several user configurations but it may fail catastrophically for you.
-So beware!
+Unfortunately, it is quite possible to get difficult to understand
+errors when working with Home Manager, such as infinite loops with no
+clear source reference. You should therefore be comfortable using the
+Nix language and the various tools in the Nix ecosystem. Reading
+through the [Nix Pills][] document is a good way to familiarize
+yourself with them.
 
-Before using Home Manager you should be comfortable using the Nix
-language and the various tools in the Nix ecosystem. Reading through
-the [Nix Pills][] document is a good way to familiarize yourself with
-them.
+If you are not very familiar with Nix but still want to use Home
+Manager then you are strongly encouraged to start with a small and
+very simple configuration and gradually make it more elaborate as you
+learn.
 
 In some cases Home Manager cannot detect whether it will overwrite a
 previous manual configuration. For example, the Gnome Terminal module

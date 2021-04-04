@@ -1814,6 +1814,79 @@ in
           A new module is available: 'services.plan9port'.
         '';
       }
+
+      {
+        time = "2021-01-31T11:23:30+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.playerctld'.
+        '';
+      }
+
+      {
+        time = "2021-01-28T15:07:34+00:00";
+        condition = hostPlatform.isDarwin;
+        message = ''
+          New options are available for 'targets.darwin':
+
+          - targets.darwin.defaults
+
+            This adds options for configuring macOS through the defaults(1)
+            system.
+
+          - targets.darwin.keybindings
+
+            This adds options for configuring the default keybindings for macOS
+            text fields.
+
+          - targets.darwin.search
+
+            This adds options for configuring the default search engine for
+            macOS.
+        '';
+      }
+
+      {
+        time = "2021-02-04T22:28:26+00:00";
+        message = ''
+          A new module is available: 'programs.sbt'.
+        '';
+      }
+
+      {
+        time = "2021-02-20T00:00:00+00:00";
+        condition = config.services.polybar.enable;
+        message = ''
+          The polybar configuration can now be written in a more nix-friendly format.
+          The new 'services.polybar.settings' option is an alternative to
+          'services.polybar.config' that supports nested keys and converts nix
+          lists to polybar-style 'foo-0, foo-1, ...' lists.
+        '';
+      }
+      {
+        time = "2021-02-25T22:36:43+00:00";
+        condition = config.programs.git.enable && any (msmtp: msmtp.enable)
+          (mapAttrsToList (name: account: account.msmtp)
+            config.accounts.email.accounts);
+        message = ''
+          Git will now defer to msmtp for sending emails if
+          'accounts.email.accounts.<name>.msmtp.enable' is true.
+        '';
+      }
+      {
+        time = "2021-03-03T22:16:05+00:00";
+        message = ''
+          Home Manager now respects the 'NO_COLOR' environment variable as per
+          https://no-color.org/.
+        '';
+      }
+      {
+        time = "2021-03-29T21:05:50+00:00";
+        message = ''
+          Configuration specified by 'programs.dircolors.extraConfig' is now
+          applied after 'programs.dircolors.settings'.
+        '';
+      }
     ];
   };
 }

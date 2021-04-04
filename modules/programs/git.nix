@@ -276,21 +276,27 @@ in {
 
         genIdentity = name: account:
           with account;
-          nameValuePair "sendemail.${name}" ({
-            smtpEncryption = if smtp.tls.enable then
-              (if smtp.tls.useStartTls
-              || versionOlder config.home.stateVersion "20.09" then
-                "tls"
-              else
-                "ssl")
-            else
-              "";
-            smtpServer = smtp.host;
-            smtpUser = userName;
+          nameValuePair "sendemail.${name}" (if account.msmtp.enable then {
+            smtpServer = "${pkgs.msmtp}/bin/msmtp";
+            envelopeSender = "auto";
             from = address;
-          } // optionalAttrs (smtp.port != null) {
-            smtpServerPort = smtp.port;
-          });
+          } else
+            {
+              smtpEncryption = if smtp.tls.enable then
+                (if smtp.tls.useStartTls
+                || versionOlder config.home.stateVersion "20.09" then
+                  "tls"
+                else
+                  "ssl")
+              else
+                "";
+              smtpSslCertPath = mkIf smtp.tls.enable smtp.tls.certificatesFile;
+              smtpServer = smtp.host;
+              smtpUser = userName;
+              from = address;
+            } // optionalAttrs (smtp.port != null) {
+              smtpServerPort = smtp.port;
+            });
       in mapAttrs' genIdentity
       (filterAttrs hasSmtp config.accounts.email.accounts);
     }
@@ -348,13 +354,14 @@ in {
     })
 
     (mkIf cfg.delta.enable {
-      programs.git.iniContent =
-        let deltaCommand = "${pkgs.gitAndTools.delta}/bin/delta";
-        in {
-          core.pager = deltaCommand;
-          interactive.diffFilter = "${deltaCommand} --color-only";
-          delta = cfg.delta.options;
-        };
+      home.packages = [ pkgs.delta ];
+
+      programs.git.iniContent = let deltaCommand = "${pkgs.delta}/bin/delta";
+      in {
+        core.pager = deltaCommand;
+        interactive.diffFilter = "${deltaCommand} --color-only";
+        delta = cfg.delta.options;
+      };
     })
   ]);
 }

@@ -11,6 +11,9 @@
 
 /modules/misc/gtk.nix                                 @rycee
 
+/modules/config/i18n.nix                              @midchildan
+/tests/modules/config/i18n                            @midchildan
+
 /modules/misc/news.nix                                @rycee
 
 /modules/misc/numlock.nix                             @evanjs
@@ -89,7 +92,8 @@
 
 /modules/programs/mcfly.nix                           @marsam
 
-/modules/programs/mpv.nix                             @tadeokondrak
+/modules/programs/mpv.nix                             @tadeokondrak @thiagokokada
+/tests/modules/programs/mpv                           @thiagokokada
 
 /modules/programs/mu.nix                              @KarlJoad
 
@@ -121,10 +125,16 @@
 
 /modules/programs/powerline-go.nix                    @DamienCassou
 
+/modules/programs/rofi.nix                            @thiagokokada
+/tests/modules/programs/rofi                          @thiagokokada
+
 /modules/programs/rofi-pass.nix                       @seylerius
 /tests/modules/programs/rofi-pass                     @seylerius
 
 /modules/programs/rtorrent.nix                        @marsam
+
+/modules/programs/sbt.nix                             @kubukoz
+/tests/modules/programs/sbt                           @kubukoz
 
 /modules/programs/ssh.nix                             @rycee
 
@@ -159,8 +169,6 @@
 /modules/services/flameshot.nix                       @moredhel
 
 /modules/services/fluidsynth.nix                      @Valodim
-
-/modules/services/gammastep.nix                       @petabyteboy
 
 /modules/services/gnome-keyring.nix                   @rycee
 
@@ -204,11 +212,15 @@
 
 /modules/services/plan9port.nix                       @ehmry
 
+/modules/services/playerctld.nix                      @fendse
+/tests/modules/playerctld                             @fendse
+
 /modules/services/pulseeffects.nix                    @jonringer
 
 /modules/services/random-background.nix               @rycee
 
-/modules/services/redshift.nix                        @rycee
+/modules/services/redshift-gammastep                  @rycee @petabyteboy @thiagokokada
+/tests/modules/redshift-gammastep                     @thiagokokada
 
 /modules/services/status-notifier-watcher.nix         @pltanton
 

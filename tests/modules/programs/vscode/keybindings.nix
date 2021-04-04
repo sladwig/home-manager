@@ -1,4 +1,4 @@
-# Test that keybdinings.json is created correctly.
+# Test that keybindings.json is created correctly.
 { config, lib, pkgs, ... }:
 
 with lib;
@@ -19,6 +19,11 @@ let
       key = "d";
       command = "deleteFile";
       when = "explorerViewletVisible";
+    }
+    {
+      key = "ctrl+r";
+      command = "run";
+      args = { command = "echo file"; };
     }
   ];
 
@@ -43,6 +48,13 @@ let
         "command": "deleteFile",
         "key": "d",
         "when": "explorerViewletVisible"
+      },
+      {
+        "args": {
+          "command": "echo file"
+        },
+        "command": "run",
+        "key": "ctrl+r"
       }
     ]
   '';
@@ -51,17 +63,8 @@ in {
     programs.vscode = {
       enable = true;
       keybindings = bindings;
+      package = pkgs.writeScriptBin "vscode" "" // { pname = "vscode"; };
     };
-
-    nixpkgs.overlays = [
-      (self: super: {
-        vscode = pkgs.runCommandLocal "vscode" { pname = "vscode"; } ''
-          mkdir -p $out/bin
-          touch $out/bin/code
-          chmod +x $out/bin/code;
-        '';
-      })
-    ];
 
     nmt.script = ''
       assertFileExists "home-files/${targetPath}"

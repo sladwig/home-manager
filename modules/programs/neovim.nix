@@ -43,29 +43,28 @@ let
 
   # A function to get the configuration string (if any) from an element of 'plugins'
   pluginConfig = p:
-    if builtins.hasAttr "plugin" p && builtins.hasAttr "config" p then ''
-      " ${p.plugin.pname} {{{
+    if p ? plugin && (p.config or "") != "" then ''
+      " ${p.plugin.pname or p.plugin.name} {{{
       ${p.config}
       " }}}
     '' else
       "";
 
-  moduleConfigure = optionalAttrs (cfg.extraConfig != ""
-    || (lib.filter (hasAttr "config") cfg.plugins) != [ ]) {
-      customRC = cfg.extraConfig
-        + pkgs.lib.concatMapStrings pluginConfig cfg.plugins;
-
-      packages.home-manager = {
-        start = filter (f: f != null) (map (x:
-          if x ? plugin && x.optional == true then null else (x.plugin or x))
+  moduleConfigure = {
+    packages.home-manager = {
+      start = filter (f: f != null) (map
+        (x: if x ? plugin && x.optional == true then null else (x.plugin or x))
+        cfg.plugins);
+      opt = filter (f: f != null)
+        (map (x: if x ? plugin && x.optional == true then x.plugin else null)
           cfg.plugins);
-        opt = filter (f: f != null)
-          (map (x: if x ? plugin && x.optional == true then x.plugin else null)
-            cfg.plugins);
-      };
     };
+    customRC = cfg.extraConfig
+      + pkgs.lib.concatMapStrings pluginConfig cfg.plugins;
+  };
+
   extraMakeWrapperArgs = lib.optionalString (cfg.extraPackages != [ ])
-    ''--prefix PATH : "${lib.makeBinPath cfg.extraPackages}"'';
+    ''--suffix PATH : "${lib.makeBinPath cfg.extraPackages}"'';
 
 in {
   options = {
@@ -184,6 +183,8 @@ in {
             };
         '';
         description = ''
+          Deprecated. Please use the other options.
+
           Generate your init file from your list of plugins and custom commands,
           and loads it from the store via <command>nvim -u /nix/store/hash-vimrc</command>
 
@@ -242,8 +243,6 @@ in {
   };
 
   config = let
-    extraMakeWrapperArgs = lib.optionalString (cfg.extraPackages != [ ])
-      ''--prefix PATH : "${lib.makeBinPath cfg.extraPackages}"'';
     neovimConfig = pkgs.neovimUtils.makeNeovimConfig {
       inherit (cfg)
         extraPython3Packages withPython3 extraPythonPackages withPython
@@ -253,11 +252,14 @@ in {
     };
 
   in mkIf cfg.enable {
-    assertions = [{
-      assertion = cfg.configure == { } || moduleConfigure == { };
-      message = "The programs.neovim option configure is mutually exclusive"
-        + " with extraConfig and plugins.";
-    }];
+    warnings = optional (cfg.configure != { }) ''
+      programs.neovim.configure is deprecated.
+      Other programs.neovim options can override its settings or ignore them.
+      Please use the other options at your disposal:
+        configure.packages.*.opt  -> programs.neovim.plugins = [ { plugin = ...; optional = true; }]
+        configure.packages.*.start  -> programs.neovim.plugins = [ { plugin = ...; }]
+        configure.customRC -> programs.neovim.extraConfig
+    '';
 
     home.packages = [ cfg.finalPackage ];
 

@@ -221,7 +221,7 @@ function doSwitch() {
 function doListGens() {
     # Whether to colorize the generations output.
     local color="never"
-    if [[ -t 1 ]]; then
+    if [[ ! -v NO_COLOR && -t 1 ]]; then
         color="always"
     fi
 
@@ -421,6 +421,7 @@ function doHelp() {
     echo
     echo "Options passed on to nix-build(1)"
     echo
+    echo "  --arg(str) NAME VALUE    Override inputs passed to home-manager.nix"
     echo "  --cores NUM"
     echo "  --keep-failed"
     echo "  --keep-going"
@@ -497,7 +498,7 @@ while [[ $# -gt 0 ]]; do
         -n|--dry-run)
             export DRY_RUN=1
             ;;
-        --option)
+        --option|--arg|--argstr)
             PASSTHROUGH_OPTS+=("$opt" "$1" "$2")
             shift 2
             ;;
@@ -513,7 +514,7 @@ while [[ $# -gt 0 ]]; do
             export VERBOSE=1
             ;;
         --version)
-            echo 21.03
+            echo 21.05
             exit 0
             ;;
         *)
