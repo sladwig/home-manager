@@ -18,6 +18,8 @@ with lib;
       };
     };
 
+    test.stubs.powerline-go = { };
+
     nmt.script = ''
       assertFileExists home-files/.bashrc
       assertFileContains \

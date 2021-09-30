@@ -47,9 +47,18 @@ in rec {
 
       name = mkOption {
         type = types.str;
-        example = "DejaVu Sans 8";
+        example = "DejaVu Sans";
         description = ''
-          The family name and size of the font within the package.
+          The family name of the font within the package.
+        '';
+      };
+
+      size = mkOption {
+        type = types.nullOr types.int;
+        default = null;
+        example = "8";
+        description = ''
+          The size of the font.
         '';
       };
     };
@@ -61,7 +70,11 @@ in rec {
     check = v: gvar.mkValue v != null;
     merge = loc: defs:
       let
-        vdefs = map (d: d // { value = gvar.mkValue d.value; }) defs;
+        vdefs = map (d:
+          d // {
+            value =
+              if gvar.isGVariant d.value then d.value else gvar.mkValue d.value;
+          }) defs;
         vals = map (d: d.value) vdefs;
         defTypes = map (x: x.type) vals;
         sameOrNull = x: y: if x == y then y else null;
@@ -73,8 +86,10 @@ in rec {
           + " mismatched GVariant types given in"
           + " ${showFiles (getFiles defs)}.")
       else if gvar.isArray sharedDefType && allChecked then
-        (types.listOf gvariant).merge loc
-        (map (d: d // { value = d.value.value; }) vdefs)
+        gvar.mkValue ((types.listOf gvariant).merge loc
+          (map (d: d // { value = d.value.value; }) vdefs)) // {
+            type = sharedDefType;
+          }
       else if gvar.isTuple sharedDefType && allChecked then
         mergeOneOption loc defs
       else if gvar.isMaybe sharedDefType && allChecked then

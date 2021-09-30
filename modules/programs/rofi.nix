@@ -207,6 +207,15 @@ in {
       '';
     };
 
+    plugins = mkOption {
+      default = [ ];
+      type = types.listOf types.package;
+      description = ''
+        List of rofi plugins to be installed.
+      '';
+      example = literalExample "[ pkgs.rofi-calc ]";
+    };
+
     width = mkOption {
       default = null;
       type = types.nullOr types.int;
@@ -261,7 +270,7 @@ in {
       description = ''
         Path to the terminal which will be used to run console applications
       '';
-      example = "\${pkgs.gnome3.gnome_terminal}/bin/gnome-terminal";
+      example = "\${pkgs.gnome.gnome_terminal}/bin/gnome-terminal";
     };
 
     separator = mkOption {
@@ -393,19 +402,29 @@ in {
   };
 
   config = mkIf cfg.enable {
-    assertions = [{
-      assertion = cfg.theme == null || cfg.colors == null;
-      message = ''
-        Cannot use the rofi options 'theme' and 'colors' simultaneously.
-      '';
-    }];
+    assertions = [
+      (hm.assertions.assertPlatform "programs.rofi" pkgs platforms.linux)
+      {
+        assertion = cfg.theme == null || cfg.colors == null;
+        message = ''
+          Cannot use the rofi options 'theme' and 'colors' simultaneously.
+        '';
+      }
+    ];
 
     lib.formats.rasi.mkLiteral = value: {
       _type = "literal";
       inherit value;
     };
 
-    home.packages = [ cfg.package ];
+    home.packages = let
+      rofiWithPlugins = cfg.package.override
+        (old: rec { plugins = (old.plugins or [ ]) ++ cfg.plugins; });
+      rofiPackage = if builtins.hasAttr "override" cfg.package then
+        rofiWithPlugins
+      else
+        cfg.package;
+    in [ rofiPackage ];
 
     home.file."${cfg.configPath}".text = toRasi {
       configuration = ({

@@ -116,6 +116,9 @@ in
     #
     #     date --iso-8601=second --universal
     #
+    # On darwin (or BSD like systems) use
+    #
+    #     date -u +'%Y-%m-%dT%H:%M:%S+00:00'
     news.entries = [
       {
         time = "2017-09-01T10:56:28+00:00";
@@ -1863,6 +1866,7 @@ in
           lists to polybar-style 'foo-0, foo-1, ...' lists.
         '';
       }
+
       {
         time = "2021-02-25T22:36:43+00:00";
         condition = config.programs.git.enable && any (msmtp: msmtp.enable)
@@ -1873,6 +1877,7 @@ in
           'accounts.email.accounts.<name>.msmtp.enable' is true.
         '';
       }
+
       {
         time = "2021-03-03T22:16:05+00:00";
         message = ''
@@ -1880,11 +1885,322 @@ in
           https://no-color.org/.
         '';
       }
+
       {
         time = "2021-03-29T21:05:50+00:00";
         message = ''
           Configuration specified by 'programs.dircolors.extraConfig' is now
           applied after 'programs.dircolors.settings'.
+        '';
+      }
+
+      {
+        time = "2021-04-11T20:44:54+00:00";
+        message = ''
+          A new module is available: 'programs.exa'.
+        '';
+      }
+
+      {
+        time = "2021-04-23T10:00:00+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.pass-secret-service'.
+        '';
+      }
+
+      {
+        time = "2021-04-26T07:00:00+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new service is available: 'services.poweralertd'.
+        '';
+      }
+
+      {
+        time = "2021-04-28T10:00:00+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new service is available: 'services.mpris-proxy'.
+        '';
+      }
+
+      {
+        time = "2021-04-28T12:00:00+00:00";
+        message = ''
+          A new module is available: 'programs.topgrade'.
+        '';
+      }
+
+      {
+        time = "2021-04-30T22:05:01+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new service is available: 'services.barrier'.
+        '';
+      }
+
+      {
+        time = "2021-05-01T15:16:08+00:00";
+        message = ''
+          A new module is available: 'programs.lazygit'.
+        '';
+      }
+
+      {
+        time = "2021-04-27T00:00:00+00:00";
+        message = ''
+          A new module is available: 'programs.ncspot'.
+        '';
+      }
+
+      {
+        time = "2021-05-02T11:22:42+00:00";
+        condition = hostPlatform.isLinux && config.services.sxhkd.enable;
+        message = ''
+          The sxhkd service now is started using 'xsession.initExtra',
+          therefore this module loses systemd service management capabilities
+          and works only if Home Manager starts the user X session.
+
+          The option 'services.sxhkd.extraPath' has been deprecated.
+        '';
+      }
+
+      {
+        time = "2021-05-06T20:47:37+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.etesync-dav'
+        '';
+      }
+
+      {
+        time = "2021-05-06T11:01:41+00:00";
+        message = ''
+          A new module is available: 'programs.nix-index'.
+        '';
+      }
+
+      {
+        time = "2021-05-10T18:50:07+00:00";
+        message = ''
+          A new module is available: 'xdg.systemDirs'. Options are:
+
+          - xdg.systemDirs.config
+
+            Extra directory names to add to $XDG_CONFIG_DIRS in the user
+            session.
+
+          - xdg.systemDirs.data
+
+            Extra directory names to add to $XDG_DATA_DIRS in the user
+            session.
+
+          These variables are visible in both systemd user services and
+          login shells.
+        '';
+      }
+
+      {
+        time = "2021-05-18T12:22:42+00:00";
+        condition = config.services.syncthing != {};
+        message = ''
+          Setting 'services.syncthing.tray' as a boolean will be deprecated in
+          the future.
+
+          This is to make the syncthing tray package configurable, with
+          `services.syncthing.tray.package`, following QSyncthingTray becoming
+          no longer actively maintained. The default syncthing tray package has
+          also changed to https://github.com/Martchus/syncthingtray. To
+          continue as before, set `services.syncthing.tray.enable`.
+
+          See
+
+            https://github.com/nix-community/home-manager/pull/1257
+
+          for discussion.
+        '';
+      }
+
+      {
+        time = "2021-05-18T20:28:50+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'programs.foot'.
+        '';
+      }
+
+      {
+        time = "2021-05-23T18:31:38+00:00";
+        condition = config.programs.mbsync.enable;
+        message = ''
+          mbsync channels no longer accepts the masterPattern or slavePattern
+          attribute keys. This is due to an upstream change.
+          They have been renamed: masterPattern -> farPattern, and
+          slavePattern -> nearPattern.
+          This is a stateful change, where the database file(s) used to keep track
+          of mail are silently upgraded once you upgrade both your configuration file
+          and the mbsync program.
+
+          Note that this change is non-reversible, meaning once you choose to switch to
+          near/farPattern, you can no longer use your previous slave/masterPattern
+          configuration file.
+        '';
+      }
+
+      {
+        time = "2021-05-10T20:41:44+00:00";
+        message = ''
+          A new module is available: 'programs.rbw'.
+        '';
+      }
+
+      {
+        time = "2021-05-30T15:22:10+00:00";
+        message = ''
+          A new module is available: 'programs.piston-cli'.
+        '';
+      }
+
+      {
+        time = "2021-06-02T04:24:10+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.xidlehook'.
+        '';
+      }
+
+      {
+        time = "2021-06-07T20:44:00+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.pantalaimon'.
+        '';
+      }
+
+      {
+        time = "2021-06-12T05:00:22+00:00";
+        message = ''
+          A new module is available: 'programs.mangohud'.
+        '';
+      }
+
+      {
+        time = "2021-06-16T01:26:16+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          The xmonad module now compiles the configuration before
+          linking the binary to the place xmonad expects to find
+          the compiled configuration (the binary).
+
+          This breaks recompilation of xmonad (i.e. the 'q' binding or
+          'xmonad --recompile').
+
+          If this behavior is undesirable, do not use the
+          'xsession.windowManager.xmonad.config' option. Instead, set the
+          contents of the configuration file with
+          'home.file.".xmonad/config.hs".text = "content of the file"'
+          or 'home.file.".xmonad/config.hs".source = ./path-to-config'.
+        '';
+      }
+
+      {
+        time = "2021-06-24T22:36:11+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'i18n.inputMethod'.
+        '';
+      }
+
+      {
+        time = "2021-06-22T14:43:53+00:00";
+        message = ''
+          A new module is available: 'programs.himalaya'.
+        '';
+      }
+
+      {
+        time = "2021-07-11T17:45:56+00:00";
+        message = ''
+          A new module is available: 'programs.sm64ex'.
+        '';
+      }
+
+      {
+        time = "2021-07-15T13:38:32+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.xsettingsd'.
+        '';
+      }
+
+      {
+        time = "2021-07-14T20:06:18+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.volnoti'.
+        '';
+      }
+
+      {
+        time = "2021-07-23T22:22:31+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.trayer'.
+        '';
+      }
+
+      {
+        time = "2021-07-19T01:30:46+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.notify-osd'.
+        '';
+      }
+
+      {
+        time = "2021-08-10T21:28:40+00:00";
+        message = ''
+          A new module is available: 'programs.java'.
+        '';
+      }
+
+      {
+        time = "2021-08-11T13:55:51+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.easyeffects'.
+        '';
+      }
+
+      {
+        time = "2021-08-16T21:59:02+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.git-sync'.
+        '';
+      }
+
+      {
+        time = "2021-08-26T06:40:59+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.fnott'.
+        '';
+      }
+
+      {
+        time = "2021-08-31T18:44:26+00:00";
+        condition = hostPlatform.isLinux;
+        message = ''
+          A new module is available: 'services.betterlockscreen'.
+        '';
+      }
+
+      {
+        time = "2021-09-14T21:31:03+00:00";
+        message = ''
+          A new module is available: 'programs.bottom'.
         '';
       }
     ];

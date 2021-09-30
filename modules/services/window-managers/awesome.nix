@@ -30,7 +30,7 @@ in {
           List of lua packages available for being
           used in the Awesome configuration.
         '';
-        example = literalExample "[ luaPackages.oocairo ]";
+        example = literalExample "[ pkgs.luaPackages.vicious ]";
       };
 
       noArgb = mkOption {
@@ -45,7 +45,13 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (hm.assertions.assertPlatform "xsession.windowManager.awesome" pkgs
+        platforms.linux)
+    ];
+
     home.packages = [ awesome ];
+
     xsession.windowManager.command = "${awesome}/bin/awesome "
       + optionalString cfg.noArgb "--no-argb " + makeSearchPath cfg.luaModules;
   };

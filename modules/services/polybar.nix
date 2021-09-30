@@ -191,14 +191,18 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.polybar" pkgs
+        lib.platforms.linux)
+    ];
+
     home.packages = [ cfg.package ];
     xdg.configFile."polybar/config".source = configFile;
 
     systemd.user.services.polybar = {
       Unit = {
         Description = "Polybar status bar";
-        After = [ "graphical-session-pre.target" ];
-        PartOf = [ "graphical-session.target" ];
+        PartOf = [ "tray.target" ];
         X-Restart-Triggers =
           [ "${config.xdg.configFile."polybar/config".source}" ];
       };
@@ -212,7 +216,7 @@ in {
         Restart = "on-failure";
       };
 
-      Install = { WantedBy = [ "graphical-session.target" ]; };
+      Install = { WantedBy = [ "tray.target" ]; };
     };
   };
 

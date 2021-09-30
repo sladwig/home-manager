@@ -1,4 +1,4 @@
-{config, lib, pkgs, ...}:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
@@ -6,19 +6,18 @@ let
 
   cfg = config.services.sxhkd;
 
-  keybindingsStr = concatStringsSep "\n" (
-    mapAttrsToList (hotkey: command:
-      optionalString (command != null) ''
-        ${hotkey}
-          ${command}
-      ''
-    )
-    cfg.keybindings
-  );
+  keybindingsStr = concatStringsSep "\n" (mapAttrsToList (hotkey: command:
+    optionalString (command != null) ''
+      ${hotkey}
+        ${command}
+    '') cfg.keybindings);
 
-in
+in {
+  imports = [
+    (mkRemovedOptionModule [ "services" "sxhkd" "extraPath" ]
+      "This option is no longer needed and can be removed.")
+  ];
 
-{
   options.services.sxhkd = {
     enable = mkEnableOption "simple X hotkey daemon";
 
@@ -26,19 +25,21 @@ in
       type = types.package;
       default = pkgs.sxhkd;
       defaultText = "pkgs.sxhkd";
-      description = "Package containing the <command>sxhkd</command> executable.";
+      description =
+        "Package containing the <command>sxhkd</command> executable.";
     };
 
     extraOptions = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      description = "Command line arguments to invoke <command>sxhkd</command> with.";
+      description =
+        "Command line arguments to invoke <command>sxhkd</command> with.";
       example = literalExample ''[ "-m 1" ]'';
     };
 
     keybindings = mkOption {
       type = types.attrsOf (types.nullOr types.str);
-      default = {};
+      default = { };
       description = "An attribute set that assigns hotkeys to commands.";
       example = literalExample ''
         {
@@ -57,44 +58,24 @@ in
           i3-msg {workspace,move container to workspace} {1-10}
       '';
     };
-
-    extraPath = mkOption {
-      default = "";
-      type = types.envVar;
-      description = ''
-        Additional <envar>PATH</envar> entries to search for commands.
-      '';
-      example = "/home/some-user/bin:/extra/path/bin";
-    };
   };
 
   config = mkIf cfg.enable {
-    home.packages = [ pkgs.sxhkd ];
-
-    xdg.configFile."sxhkd/sxhkdrc".text = concatStringsSep "\n" [
-      keybindingsStr
-      cfg.extraConfig
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.sxhkd" pkgs
+        lib.platforms.linux)
     ];
 
-    systemd.user.services.sxhkd = {
-      Unit = {
-        Description = "simple X hotkey daemon";
-        After = [ "graphical-session-pre.target" ];
-        PartOf = [ "graphical-session.target" ];
-      };
+    home.packages = [ cfg.package ];
 
-      Service = {
-        Environment =
-          "PATH="
-          + "${config.home.profileDirectory}/bin"
-          + optionalString (cfg.extraPath != "") ":"
-          + cfg.extraPath;
-        ExecStart = "${cfg.package}/bin/sxhkd ${toString cfg.extraOptions}";
-      };
+    xdg.configFile."sxhkd/sxhkdrc".text =
+      concatStringsSep "\n" [ keybindingsStr cfg.extraConfig ];
 
-      Install = {
-        WantedBy = [ "graphical-session.target" ];
-      };
-    };
+    xsession.initExtra = let
+      sxhkdCommand = "${cfg.package}/bin/sxhkd ${toString cfg.extraOptions}";
+    in ''
+      systemctl --user stop sxhkd.scope 2> /dev/null || true
+      systemd-cat -t sxhkd systemd-run --user --scope -u sxhkd ${sxhkdCommand} &
+    '';
   };
 }

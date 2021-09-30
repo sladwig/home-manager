@@ -373,6 +373,16 @@ in
       description = "The package containing the complete activation script.";
     };
 
+    home.extraActivationPath = mkOption {
+      internal = true;
+      type = types.listOf types.package;
+      default = [ ];
+      description = ''
+        Extra packages to add to <envar>PATH</envar> within the activation
+        script.
+      '';
+    };
+
     home.extraBuilderCommands = mkOption {
       type = types.lines;
       default = "";
@@ -390,6 +400,21 @@ in
         Extra commands to run in the Home Manager profile builder.
       '';
     };
+
+    home.enableNixpkgsReleaseCheck = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Determines whether to check for release version mismatch between Home
+        Manager and Nixpkgs. Using mismatched versions is likely to cause errors
+        and unexpected behavior. It is therefore highly recommended to use a
+        release of Home Manager than corresponds with your chosen release of
+        Nixpkgs.
+        </para><para>
+        When this option is enabled and a mismatch is detected then a warning
+        will be printed when the user configuration is being built.
+      '';
+    };
   };
 
   config = {
@@ -403,6 +428,31 @@ in
         message = "Home directory could not be determined";
       }
     ];
+
+    warnings =
+      let
+        hmRelease = fileContents ../.release;
+        nixpkgsRelease = pkgs.lib.trivial.release;
+        releaseMismatch =
+          config.home.enableNixpkgsReleaseCheck
+          && hmRelease != nixpkgsRelease;
+      in
+        optional releaseMismatch ''
+          You are using
+
+            Home Manager version ${hmRelease} and
+            Nixpkgs version ${nixpkgsRelease}.
+
+          Using mismatched versions is likely to cause errors and unexpected
+          behavior. It is therefore highly recommended to use a release of Home
+          Manager than corresponds with your chosen release of Nixpkgs.
+
+          If you insist then you can disable this warning by adding
+
+            home.enableNixpkgsReleaseCheck = false;
+
+          to your configuration.
+        '';
 
     home.username =
       mkIf (versionOlder config.home.stateVersion "20.09")
@@ -493,7 +543,24 @@ in
         ''
       else
         ''
-          $DRY_RUN_CMD nix-env -i ${cfg.path}
+          if ! $DRY_RUN_CMD nix-env -i ${cfg.path} ; then
+            cat <<EOF
+
+          Oops, nix-env failed to install your new Home Manager profile!
+
+          Perhaps there is a conflict with a package that was installed using
+          'nix-env -i'? Try running
+
+              nix-env -q
+
+          and if there is a conflicting package you can remove it with
+
+              nix-env -e {package name}
+
+          Then try activating your Home Manager configuration again.
+          EOF
+            exit 1
+          fi
         ''
     );
 
@@ -513,20 +580,20 @@ in
 
         # Programs that always should be available on the activation
         # script's PATH.
-        activationBinPaths = lib.makeBinPath [
-          pkgs.bash
-          pkgs.coreutils
-          pkgs.diffutils        # For `cmp` and `diff`.
-          pkgs.findutils
-          pkgs.gnugrep
-          pkgs.gnused
-          pkgs.ncurses          # For `tput`.
-        ]
+        activationBinPaths = lib.makeBinPath (
+          [
+            pkgs.bash
+            pkgs.coreutils
+            pkgs.diffutils        # For `cmp` and `diff`.
+            pkgs.findutils
+            pkgs.gnugrep
+            pkgs.gnused
+            pkgs.ncurses          # For `tput`.
+          ] ++ config.home.extraActivationPath
+        )
         + optionalString (!cfg.emptyActivationPath) "\${PATH:+:}$PATH";
 
-        activationScript = pkgs.writeScript "activation-script" ''
-          #!${pkgs.runtimeShell}
-
+        activationScript = pkgs.writeShellScript "activation-script" ''
           set -eu
           set -o pipefail
 
@@ -551,6 +618,9 @@ in
             mkdir -p $out
 
             cp ${activationScript} $out/activate
+
+            mkdir $out/bin
+            ln -s $out/activate $out/bin/home-manager-generation
 
             substituteInPlace $out/activate \
               --subst-var-by GENERATION_DIR $out

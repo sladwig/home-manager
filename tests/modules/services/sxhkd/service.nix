@@ -1,22 +1,26 @@
 { config, pkgs, ... }:
+
 {
-  config = {
-    services.sxhkd = {
-      enable = true;
-      package = pkgs.runCommandLocal "dummy-package" { } "mkdir $out" // { outPath = "@sxhkd@"; };
-      extraOptions = [ "-m 1" ];
-      extraPath = "/home/the-user/bin:/extra/path/bin";
-    };
-
-    nmt.script = ''
-      serviceFile=home-files/.config/systemd/user/sxhkd.service
-
-      assertFileExists $serviceFile
-
-      assertFileRegex $serviceFile 'ExecStart=@sxhkd@/bin/sxhkd -m 1'
-
-      assertFileRegex $serviceFile \
-        'Environment=PATH=.*\.nix-profile/bin:/home/the-user/bin:/extra/path/bin'
-    '';
+  xsession = {
+    enable = true;
+    windowManager.command = "";
   };
+
+  services.sxhkd = {
+    enable = true;
+    package = config.lib.test.mkStubPackage { outPath = "@sxhkd@"; };
+    extraOptions = [ "-m 1" ];
+  };
+
+  nmt.script = ''
+    xsessionFile=home-files/.xsession
+
+    assertFileExists $xsessionFile
+
+    assertFileContains $xsessionFile \
+      'systemctl --user stop sxhkd.scope 2> /dev/null || true'
+
+    assertFileContains $xsessionFile \
+      'systemd-cat -t sxhkd systemd-run --user --scope -u sxhkd @sxhkd@/bin/sxhkd -m 1 &'
+  '';
 }

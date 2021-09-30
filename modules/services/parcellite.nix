@@ -22,12 +22,18 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.parcellite" pkgs
+        lib.platforms.linux)
+    ];
+
     home.packages = [ cfg.package ];
 
     systemd.user.services.parcellite = {
       Unit = {
         Description = "Lightweight GTK+ clipboard manager";
-        After = [ "graphical-session-pre.target" ];
+        Requires = [ "tray.target" ];
+        After = [ "graphical-session-pre.target" "tray.target" ];
         PartOf = [ "graphical-session.target" ];
       };
 

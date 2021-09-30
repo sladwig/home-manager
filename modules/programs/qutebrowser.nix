@@ -32,6 +32,8 @@ let
         ''config.bind("${k}", "${escape [ ''"'' ] c}", mode="${m}")'';
     in concatStringsSep "\n" (mapAttrsToList (formatKeyBinding m) b);
 
+  formatQuickmarks = n: s: "${n} ${s}";
+
 in {
   options.programs.qutebrowser = {
     enable = mkEnableOption "qutebrowser";
@@ -251,6 +253,21 @@ in {
       '';
     };
 
+    quickmarks = mkOption {
+      type = types.attrsOf types.str;
+      default = { };
+      description = ''
+        Quickmarks to add to qutebrowser's <filename>quickmarks</filename> file.
+        Note that when Home Manager manages your quickmarks, you cannot edit them at runtime.
+      '';
+      example = literalExample ''
+        {
+          nixpkgs = "https://github.com/NixOS/nixpkgs";
+          home-manager = "https://github.com/nix-community/home-manager";
+        }
+      '';
+    };
+
     extraConfig = mkOption {
       type = types.lines;
       default = "";
@@ -260,16 +277,13 @@ in {
     };
   };
 
-  config = mkIf cfg.enable {
-    home.packages = [ cfg.package ];
-
-    xdg.configFile."qutebrowser/config.py".text = concatStringsSep "\n" ([ ]
-      ++ [
-        "${if cfg.loadAutoconfig then
-          "config.load_autoconfig()"
-        else
-          "config.load_autoconfig(False)"}"
-      ] ++ mapAttrsToList (formatLine "c.") cfg.settings
+  config = let
+    qutebrowserConfig = concatStringsSep "\n" ([
+      (if cfg.loadAutoconfig then
+        "config.load_autoconfig()"
+      else
+        "config.load_autoconfig(False)")
+    ] ++ mapAttrsToList (formatLine "c.") cfg.settings
       ++ mapAttrsToList (formatDictLine "c.aliases") cfg.aliases
       ++ mapAttrsToList (formatDictLine "c.url.searchengines") cfg.searchEngines
       ++ mapAttrsToList (formatDictLine "c.bindings.key_mappings")
@@ -277,5 +291,43 @@ in {
       ++ optional (!cfg.enableDefaultBindings) "c.bindings.default = {}"
       ++ mapAttrsToList formatKeyBindings cfg.keyBindings
       ++ optional (cfg.extraConfig != "") cfg.extraConfig);
+
+    quickmarksFile = optionals (cfg.quickmarks != { }) concatStringsSep "\n"
+      ((mapAttrsToList formatQuickmarks cfg.quickmarks));
+  in mkIf cfg.enable {
+    home.packages = [ cfg.package ];
+
+    home.file.".qutebrowser/config.py" =
+      mkIf pkgs.stdenv.hostPlatform.isDarwin { text = qutebrowserConfig; };
+
+    home.file.".qutebrowser/quickmarks" =
+      mkIf (cfg.quickmarks != { } && pkgs.stdenv.hostPlatform.isDarwin) {
+        text = quickmarksFile;
+      };
+
+    xdg.configFile."qutebrowser/config.py" =
+      mkIf pkgs.stdenv.hostPlatform.isLinux {
+        text = qutebrowserConfig;
+        onChange = ''
+          hash="$(echo -n "$USER" | md5sum | cut -d' ' -f1)"
+          socket="''${XDG_RUNTIME_DIR:-/run/user/$UID}/qutebrowser/ipc-$hash"
+          if [[ -S $socket ]]; then
+            command=${
+              escapeShellArg (builtins.toJSON {
+                args = [ ":config-source" ];
+                target_arg = null;
+                protocol_version = 1;
+              })
+            }
+            echo "$command" | ${pkgs.socat}/bin/socat -lf /dev/null - UNIX-CONNECT:"$socket"
+          fi
+          unset hash socket command
+        '';
+      };
+
+    xdg.configFile."qutebrowser/quickmarks" =
+      mkIf (cfg.quickmarks != { } && pkgs.stdenv.hostPlatform.isLinux) {
+        text = quickmarksFile;
+      };
   };
 }

@@ -71,7 +71,7 @@ let
       };
 
       certificatesFile = mkOption {
-        type = types.path;
+        type = types.nullOr types.path;
         default = config.accounts.email.certificatesFile;
         defaultText = "config.accounts.email.certificatesFile";
         description = ''
@@ -332,7 +332,10 @@ let
       (mkIf (config.flavor == "gmail.com") {
         userName = mkDefault config.address;
 
-        imap = { host = "imap.gmail.com"; };
+        imap = {
+          host = "imap.gmail.com";
+          port = 993;
+        };
 
         smtp = {
           host = "smtp.gmail.com";
@@ -351,7 +354,7 @@ let
 in {
   options.accounts.email = {
     certificatesFile = mkOption {
-      type = types.path;
+      type = types.nullOr types.path;
       default = "/etc/ssl/certs/ca-certificates.crt";
       description = ''
         Path to default file containing certificate authorities that

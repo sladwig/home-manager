@@ -53,12 +53,22 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.xcape" pkgs
+        lib.platforms.linux)
+    ];
+
     systemd.user.services.xcape = {
-      Unit = {
-        Description = "xcape";
-        After = [ "graphical-session-pre.target" ];
-        PartOf = [ "graphical-session.target" ];
-      };
+      Unit = mkMerge [
+        {
+          Description = "xcape";
+          After = [ "graphical-session-pre.target" ];
+          PartOf = [ "graphical-session.target" ];
+        }
+        (mkIf (config.home.keyboard != null && config.home.keyboard != { }) {
+          After = [ "graphical-session-pre.target" "setxkbmap.service" ];
+        })
+      ];
 
       Service = {
         Type = "forking";

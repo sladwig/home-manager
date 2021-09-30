@@ -353,16 +353,26 @@ in {
     in allWarnings;
 
   in mkIf cfg.enable (mkMerge [
-    { home.packages = [ cfg.package ]; }
+    {
+      assertions = [
+        (lib.hm.assertions.assertPlatform "programs.waybar" pkgs
+          lib.platforms.linux)
+      ];
+
+      home.packages = [ cfg.package ];
+    }
+
     (mkIf (cfg.settings != [ ]) {
       # Generate warnings about defined but unreferenced modules
       inherit warnings;
 
       xdg.configFile."waybar/config".source = configSource;
     })
+
     (mkIf (cfg.style != null) {
       xdg.configFile."waybar/style.css".text = cfg.style;
     })
+
     (mkIf cfg.systemd.enable {
       systemd.user.services.waybar = {
         Unit = {
@@ -370,14 +380,13 @@ in {
             "Highly customizable Wayland bar for Sway and Wlroots based compositors.";
           Documentation = "https://github.com/Alexays/Waybar/wiki";
           PartOf = [ "graphical-session.target" ];
+          After = [ "graphical-session.target" ];
         };
 
         Service = {
-          Type = "dbus";
-          BusName = "fr.arouillard.waybar";
           ExecStart = "${cfg.package}/bin/waybar";
-          Restart = "always";
-          RestartSec = "1sec";
+          ExecReload = "kill -SIGUSR2 $MAINPID";
+          Restart = "on-failure";
           KillMode = "mixed";
         };
 

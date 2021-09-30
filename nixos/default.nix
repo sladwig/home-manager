@@ -32,6 +32,10 @@ let
 
           home.username = config.users.users.${name}.name;
           home.homeDirectory = config.users.users.${name}.home;
+
+          # Make activation script use same version of Nix as system as a whole.
+          # This avoids problems with Nix not being in PATH.
+          home.extraActivationPath = [ config.nix.package ];
         };
       })
     ] ++ cfg.sharedModules;
@@ -125,24 +129,50 @@ in {
         wantedBy = [ "multi-user.target" ];
         wants = [ "nix-daemon.socket" ];
         after = [ "nix-daemon.socket" ];
+        before = [ "systemd-user-sessions.service" ];
 
         environment = serviceEnvironment;
 
         unitConfig = { RequiresMountsFor = usercfg.home.homeDirectory; };
 
+        stopIfChanged = false;
+
         serviceConfig = {
           User = usercfg.home.username;
           Type = "oneshot";
           RemainAfterExit = "yes";
+          TimeoutStartSec = 90;
           SyslogIdentifier = "hm-activate-${username}";
 
-          # The activation script is run by a login shell to make sure
-          # that the user is given a sane Nix environment.
-          ExecStart = pkgs.writeScript "activate-${username}" ''
-            #! ${pkgs.runtimeShell} -el
-            echo Activating home-manager configuration for ${username}
-            exec ${usercfg.home.activationPackage}/activate
-          '';
+          ExecStart = let
+            systemctl =
+              "XDG_RUNTIME_DIR=\${XDG_RUNTIME_DIR:-/run/user/$UID} systemctl";
+
+            sed = "${pkgs.gnused}/bin/sed";
+
+            exportedSystemdVariables = concatStringsSep "|" [
+              "DBUS_SESSION_BUS_ADDRESS"
+              "DISPLAY"
+              "WAYLAND_DISPLAY"
+              "XAUTHORITY"
+              "XDG_RUNTIME_DIR"
+            ];
+
+            setupEnv = pkgs.writeScript "hm-setup-env" ''
+              #! ${pkgs.runtimeShell} -el
+
+              # The activation script is run by a login shell to make sure
+              # that the user is given a sane environment.
+              # If the user is logged in, import variables from their current
+              # session environment.
+              eval "$(
+                ${systemctl} --user show-environment 2> /dev/null \
+                | ${sed} -En '/^(${exportedSystemdVariables})=/s/^/export /p'
+              )"
+
+              exec "$1/activate"
+            '';
+          in "${setupEnv} ${usercfg.home.activationPackage}";
         };
       }) cfg.users;
   };

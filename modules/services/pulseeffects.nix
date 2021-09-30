@@ -12,14 +12,19 @@ in {
   meta.maintainers = [ maintainers.jonringer ];
 
   options.services.pulseeffects = {
-    enable = mkEnableOption "Pulseeffects daemon";
+    enable = mkEnableOption ''
+      Pulseeffects daemon
+      Note, it is necessary to add
+      <programlisting language="nix">
+      programs.dconf.enable = true;
+      </programlisting>
+      to your system configuration for the daemon to work correctly'';
 
     package = mkOption {
       type = types.package;
-      default = pkgs.pulseeffects;
-      defaultText = literalExample "pkgs.pulseeffects";
+      default = pkgs.pulseeffects-legacy;
+      defaultText = literalExample "pkgs.pulseeffects-legacy";
       description = "Pulseeffects package to use.";
-      example = literalExample "pkgs.pulseeffects-pw";
     };
 
     preset = mkOption {
@@ -33,13 +38,15 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.pulseeffects" pkgs
+        lib.platforms.linux)
+    ];
+
     # running pulseeffects will just attach itself to gapplication service
     # at-spi2-core is to minimize journalctl noise of:
     # "AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files"
     home.packages = [ cfg.package pkgs.at-spi2-core ];
-
-    # Will need to add `services.dbus.packages = with pkgs; [ gnome3.dconf ];`
-    # to /etc/nixos/configuration.nix for daemon to work correctly
 
     systemd.user.services.pulseeffects = {
       Unit = {

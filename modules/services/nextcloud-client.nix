@@ -17,10 +17,22 @@ in {
         defaultText = literalExample "pkgs.nextcloud-client";
         description = "The package to use for the nextcloud client binary.";
       };
+
+      startInBackground = mkOption {
+        type = types.bool;
+        default = false;
+        description =
+          "Whether to start the Nextcloud client in the background.";
+      };
     };
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.nextcloud-client" pkgs
+        lib.platforms.linux)
+    ];
+
     systemd.user.services.nextcloud-client = {
       Unit = {
         Description = "Nextcloud Client";
@@ -30,7 +42,8 @@ in {
 
       Service = {
         Environment = "PATH=${config.home.profileDirectory}/bin";
-        ExecStart = "${cfg.package}/bin/nextcloud";
+        ExecStart = "${cfg.package}/bin/nextcloud"
+          + (optionalString cfg.startInBackground " --background");
       };
 
       Install = { WantedBy = [ "graphical-session.target" ]; };

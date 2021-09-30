@@ -98,12 +98,18 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.cbatticon" pkgs
+        lib.platforms.linux)
+    ];
+
     home.packages = [ package ];
 
     systemd.user.services.cbatticon = {
       Unit = {
         Description = "cbatticon system tray battery icon";
-        After = [ "graphical-session-pre.target" ];
+        Requires = [ "tray.target" ];
+        After = [ "graphical-session-pre.target" "tray.target" ];
         PartOf = [ "graphical-session.target" ];
       };
 

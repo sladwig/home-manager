@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> {}, enableBig ? true }:
 
 let
 
@@ -7,8 +7,8 @@ let
   nmt = pkgs.fetchFromGitLab {
     owner = "rycee";
     repo = "nmt";
-    rev = "d2cc8c1042b1c2511f68f40e2790a8c0e29eeb42";
-    sha256 = "1ykcvyx82nhdq167kbnpgwkgjib8ii7c92y3427v986n2s5lsskc";
+    rev = "89924d8e6e0fcf866a11324d32c6bcaa89cda506";
+    sha256 = "02wzrbmpdpgig58a1rhz8sb0p2rvbapnlcmhi4d4bi8w9md6pmdl";
   };
 
   modules = import ../modules/modules.nix {
@@ -26,9 +26,12 @@ let
       # unnecessary rebuilds of the tests.
       manual.manpages.enable = false;
 
-      imports = [ ./asserts.nix ];
+      imports = [ ./asserts.nix ./stubs.nix ];
     }
   ];
+
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  isLinux = pkgs.stdenv.hostPlatform.isLinux;
 
 in
 
@@ -45,6 +48,9 @@ import nmt {
     ./modules/programs/aria2
     ./modules/programs/autojump
     ./modules/programs/bash
+    ./modules/programs/bat
+    ./modules/programs/bottom
+    ./modules/programs/broot
     ./modules/programs/browserpass
     ./modules/programs/dircolors
     ./modules/programs/direnv
@@ -53,8 +59,12 @@ import nmt {
     ./modules/programs/gh
     ./modules/programs/git
     ./modules/programs/gpg
+    ./modules/programs/himalaya
+    ./modules/programs/htop
     ./modules/programs/i3status
+    ./modules/programs/irsii
     ./modules/programs/kakoune
+    ./modules/programs/kitty
     ./modules/programs/lf
     ./modules/programs/lieer
     ./modules/programs/man
@@ -64,24 +74,30 @@ import nmt {
     ./modules/programs/ne
     ./modules/programs/neomutt
     ./modules/programs/newsboat
+    ./modules/programs/nix-index
     ./modules/programs/nushell
+    ./modules/programs/pet
     ./modules/programs/powerline-go
     ./modules/programs/qutebrowser
     ./modules/programs/readline
     ./modules/programs/sbt
+    ./modules/programs/scmpuff
+    ./modules/programs/sm64ex
     ./modules/programs/ssh
     ./modules/programs/starship
     ./modules/programs/texlive
     ./modules/programs/tmux
+    ./modules/programs/topgrade
     ./modules/programs/vscode
     ./modules/programs/zplug
     ./modules/programs/zsh
     ./modules/xresources
-  ] ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+  ] ++ lib.optionals isDarwin [
     ./modules/targets-darwin
-  ] ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+  ] ++ lib.optionals isLinux [
     ./modules/config/i18n
-    ./modules/misc/debug
+    ./modules/i18n/input-method
+    ./modules/misc/gtk
     ./modules/misc/numlock
     ./modules/misc/pam
     ./modules/misc/qt
@@ -89,28 +105,46 @@ import nmt {
     ./modules/misc/xsession
     ./modules/programs/abook
     ./modules/programs/autorandr
-    ./modules/programs/firefox
+    ./modules/programs/foot
     ./modules/programs/getmail
+    ./modules/programs/gnome-terminal
     ./modules/programs/i3status-rust
+    ./modules/programs/mangohud
     ./modules/programs/ncmpcpp-linux
     ./modules/programs/neovim   # Broken package dependency on Darwin.
+    ./modules/programs/rbw
     ./modules/programs/rofi
     ./modules/programs/rofi-pass
+    ./modules/programs/terminator
     ./modules/programs/waybar
+    ./modules/programs/xmobar
+    ./modules/services/barrier
+    ./modules/services/devilspie2
     ./modules/services/dropbox
     ./modules/services/emacs
     ./modules/services/fluidsynth
+    ./modules/services/fnott
+    ./modules/services/git-sync
     ./modules/services/kanshi
     ./modules/services/lieer
-    ./modules/services/redshift-gammastep
+    ./modules/services/pantalaimon
     ./modules/services/pbgopy
     ./modules/services/playerctld
     ./modules/services/polybar
+    ./modules/services/redshift-gammastep
     ./modules/services/sxhkd
+    ./modules/services/syncthing
+    ./modules/services/trayer
+    ./modules/services/window-managers/bspwm
     ./modules/services/window-managers/i3
     ./modules/services/window-managers/sway
     ./modules/services/wlsunset
     ./modules/systemd
     ./modules/targets-linux
+  ] ++ lib.optionals enableBig [
+    ./modules/programs/emacs
+  ] ++ lib.optionals (enableBig && isLinux) [
+    ./modules/misc/debug
+    ./modules/programs/firefox
   ]);
 }

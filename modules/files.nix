@@ -39,6 +39,28 @@ in
   };
 
   config = {
+    assertions = [(
+      let
+        dups =
+          attrNames
+            (filterAttrs (n: v: v > 1)
+            (foldAttrs (acc: v: acc + v) 0
+            (mapAttrsToList (n: v: { ${v.target} = 1; }) cfg)));
+        dupsStr = concatStringsSep ", " dups;
+      in {
+        assertion = dups == [];
+        message = ''
+          Conflicting managed target files: ${dupsStr}
+
+          This may happen, for example, if you have a configuration similar to
+
+              home.file = {
+                conflict1 = { source = ./foo.nix; target = "baz"; };
+                conflict2 = { source = ./bar.nix; target = "baz"; };
+              }'';
+      })
+    ];
+
     lib.file.mkOutOfStoreSymlink = path:
       let
         pathStr = toString path;
@@ -53,7 +75,7 @@ in
         # Paths that should be forcibly overwritten by Home Manager.
         # Caveat emptor!
         forcedPaths =
-          concatMapStringsSep " " (p: ''"$HOME/${p}"'')
+          concatMapStringsSep " " (p: ''"$HOME"/${escapeShellArg p}'')
             (mapAttrsToList (n: v: v.target)
             (filterAttrs (n: v: v.force) cfg));
 
@@ -62,7 +84,7 @@ in
 
           # A symbolic link whose target path matches this pattern will be
           # considered part of a Home Manager generation.
-          homeFilePattern="$(readlink -e "${builtins.storeDir}")/*-home-manager-files/*"
+          homeFilePattern="$(readlink -e ${escapeShellArg builtins.storeDir})/*-home-manager-files/*"
 
           forcedPaths=(${forcedPaths})
 
@@ -84,7 +106,12 @@ in
               $VERBOSE_ECHO "Skipping collision check for $targetPath"
             elif [[ -e "$targetPath" \
                 && ! "$(readlink "$targetPath")" == $homeFilePattern ]] ; then
-              if [[ ! -L "$targetPath" && -n "$HOME_MANAGER_BACKUP_EXT" ]] ; then
+              # The target file already exists and it isn't a symlink owned by Home Manager.
+              if cmp -s $sourcePath $targetPath; then
+                # First compare the files' content. If they're equal, we're fine.
+                warnEcho "Existing file '$targetPath' is in the way of '$sourcePath', will be skipped since they are the same"
+              elif [[ ! -L "$targetPath" && -n "$HOME_MANAGER_BACKUP_EXT" ]] ; then
+                # Next, try to move the file to a backup location if configured and possible
                 backup="$targetPath.$HOME_MANAGER_BACKUP_EXT"
                 if [[ -e "$backup" ]]; then
                   errorEcho "Existing file '$backup' would be clobbered by backing up '$targetPath'"
@@ -93,6 +120,7 @@ in
                   warnEcho "Existing file '$targetPath' is in the way of '$sourcePath', will be moved to '$backup'"
                 fi
               else
+                # Fail if nothing else works
                 errorEcho "Existing file '$targetPath' is in the way of '$sourcePath'"
                 collision=1
               fi
@@ -100,7 +128,7 @@ in
           done
 
           if [[ -v collision ]] ; then
-            errorEcho "Please move the above files and try again or use -b <ext> to move automatically."
+            errorEcho "Please move the above files and try again or use 'home-manager switch -b backup' to back up existing files automatically."
             exit 1
           fi
         '';
@@ -140,27 +168,35 @@ in
     # source and target generation.
     home.activation.linkGeneration = hm.dag.entryAfter ["writeBoundary"] (
       let
-        link = pkgs.writeText "link" ''
+        link = pkgs.writeShellScript "link" ''
           newGenFiles="$1"
           shift
           for sourcePath in "$@" ; do
             relativePath="''${sourcePath#$newGenFiles/}"
             targetPath="$HOME/$relativePath"
             if [[ -e "$targetPath" && ! -L "$targetPath" && -n "$HOME_MANAGER_BACKUP_EXT" ]] ; then
+              # The target exists, back it up
               backup="$targetPath.$HOME_MANAGER_BACKUP_EXT"
               $DRY_RUN_CMD mv $VERBOSE_ARG "$targetPath" "$backup" || errorEcho "Moving '$targetPath' failed!"
             fi
-            $DRY_RUN_CMD mkdir -p $VERBOSE_ARG "$(dirname "$targetPath")"
-            $DRY_RUN_CMD ln -nsf $VERBOSE_ARG "$sourcePath" "$targetPath"
+
+            if [[ -e "$targetPath" && ! -L "$targetPath" ]] && cmp -s $sourcePath $targetPath ; then
+              # The target exists but is identical – don't do anything.
+              $VERBOSE_ECHO "Skipping '$targetPath' as it is identical to '$sourcePath'"
+            else
+              # Place that symlink, --force
+              $DRY_RUN_CMD mkdir -p $VERBOSE_ARG "$(dirname "$targetPath")"
+              $DRY_RUN_CMD ln -nsf $VERBOSE_ARG "$sourcePath" "$targetPath"
+            fi
           done
         '';
 
-        cleanup = pkgs.writeText "cleanup" ''
+        cleanup = pkgs.writeShellScript "cleanup" ''
           . ${./lib-bash/color-echo.sh}
 
           # A symbolic link whose target path matches this pattern will be
           # considered part of a Home Manager generation.
-          homeFilePattern="$(readlink -e "${builtins.storeDir}")/*-home-manager-files/*"
+          homeFilePattern="$(readlink -e ${escapeShellArg builtins.storeDir})/*-home-manager-files/*"
 
           newGenFiles="$1"
           shift 1
@@ -235,31 +271,50 @@ in
     );
 
     home.activation.checkFilesChanged = hm.dag.entryBefore ["linkGeneration"] (
-      ''
+      let
+        homeDirArg = escapeShellArg homeDirectory;
+      in ''
+        function _cmp() {
+          if [[ -d $1 && -d $2 ]]; then
+            diff -rq "$1" "$2" &> /dev/null
+          else
+            cmp --quiet "$1" "$2"
+          fi
+        }
         declare -A changedFiles
-      '' + concatMapStrings (v: ''
-        cmp --quiet "${sourceStorePath v}" "${homeDirectory}/${v.target}" \
-          && changedFiles["${v.target}"]=0 \
-          || changedFiles["${v.target}"]=1
-      '') (filter (v: v.onChange != "") (attrValues cfg))
+      '' + concatMapStrings (v:
+        let
+          sourceArg = escapeShellArg (sourceStorePath v);
+          targetArg = escapeShellArg v.target;
+        in ''
+          _cmp ${sourceArg} ${homeDirArg}/${targetArg} \
+            && changedFiles[${targetArg}]=0 \
+            || changedFiles[${targetArg}]=1
+        '') (filter (v: v.onChange != "") (attrValues cfg))
+      + ''
+        unset -f _cmp
+      ''
     );
 
     home.activation.onFilesChange = hm.dag.entryAfter ["linkGeneration"] (
       concatMapStrings (v: ''
-        if [[ ${"$\{changedFiles"}["${v.target}"]} -eq 1 ]]; then
-          ${v.onChange}
+        if (( ''${changedFiles[${escapeShellArg v.target}]} == 1 )); then
+          if [[ -v DRY_RUN || -v VERBOSE ]]; then
+            echo "Running onChange hook for" ${escapeShellArg v.target}
+          fi
+          if [[ ! -v DRY_RUN ]]; then
+            ${v.onChange}
+          fi
         fi
       '') (filter (v: v.onChange != "") (attrValues cfg))
     );
 
     # Symlink directories and files that have the right execute bit.
     # Copy files that need their execute bit changed.
-    home-files = pkgs.runCommand
+    home-files = pkgs.runCommandLocal
       "home-manager-files"
       {
         nativeBuildInputs = [ pkgs.xorg.lndir ];
-        preferLocalBuild = true;
-        allowSubstitutes = false;
       }
       (''
         mkdir -p $out
@@ -272,6 +327,15 @@ in
           local relTarget="$2"
           local executable="$3"
           local recursive="$4"
+
+          # If the target already exists then we have a collision. Note, this
+          # should not happen due to the assertion found in the 'files' module.
+          # We therefore simply log the conflict and otherwise ignore it, mainly
+          # to make the `files-target-config` test work as expected.
+          if [[ -e "$realOut/$relTarget" ]]; then
+            echo "File conflict for file '$relTarget'" >&2
+            return
+          fi
 
           # Figure out the real absolute path to the target.
           local target

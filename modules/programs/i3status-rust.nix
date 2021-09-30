@@ -6,14 +6,6 @@ let
 
   cfg = config.programs.i3status-rust;
 
-  restartI3 = ''
-    i3Socket=''${XDG_RUNTIME_DIR:-/run/user/$UID}/i3/ipc-socket.*
-    if [ -S $i3Socket ]; then
-      echo "Reloading i3"
-      $DRY_RUN_CMD ${config.xsession.windowManager.i3.package}/bin/i3-msg -s $i3Socket restart 1>/dev/null
-    fi
-  '';
-
   settingsFormat = pkgs.formats.toml { };
 
 in {
@@ -42,8 +34,8 @@ in {
               {
                 block = "memory";
                 display_type = "memory";
-                format_mem = "{Mup}%";
-                format_swap = "{SUp}%";
+                format_mem = "{mem_used_percents}";
+                format_swap = "{swap_used_percents}";
               }
               {
                 block = "cpu";
@@ -85,7 +77,7 @@ in {
                   on_click = "pavucontrol --tab=3";
                   mappings = {
                    "alsa_output.pci-0000_00_1f.3.analog-stereo" = "";
-                   "bluez_sink.70_26_05_DA_27_A4.a2dp_sink" = ""
+                   "bluez_sink.70_26_05_DA_27_A4.a2dp_sink" = "";
                   };
                 }
               ];
@@ -205,8 +197,8 @@ in {
              {
                block = "memory";
                display_type = "memory";
-               format_mem = "{Mup}%";
-               format_swap = "{SUp}%";
+               format_mem = "{mem_used_percents}";
+               format_swap = "{swap_used_percents}";
              }
              {
                block = "cpu";
@@ -249,11 +241,21 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (hm.assertions.assertPlatform "programs.i3status-rust" pkgs
+        platforms.linux)
+    ];
+
     home.packages = [ cfg.package ];
 
     xdg.configFile = mapAttrs' (cfgFileSuffix: cfg:
       nameValuePair ("i3status-rust/config-${cfgFileSuffix}.toml") ({
-        onChange = mkIf config.xsession.windowManager.i3.enable restartI3;
+        onChange = mkIf config.xsession.windowManager.i3.enable ''
+          i3Socket="''${XDG_RUNTIME_DIR:-/run/user/$UID}/i3/ipc-socket.*"
+          if [[ -S $i3Socket ]]; then
+            ${config.xsession.windowManager.i3.package}/bin/i3-msg -s $i3Socket restart >/dev/null
+          fi
+        '';
 
         source = settingsFormat.generate ("config-${cfgFileSuffix}.toml") ({
           theme = cfg.theme;

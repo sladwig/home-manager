@@ -25,6 +25,11 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.gnome-keyring" pkgs
+        lib.platforms.linux)
+    ];
+
     systemd.user.services.gnome-keyring = {
       Unit = {
         Description = "GNOME Keyring";
@@ -36,7 +41,7 @@ in {
           args = concatStringsSep " " ([ "--start" "--foreground" ]
             ++ optional (cfg.components != [ ])
             ("--components=" + concatStringsSep "," cfg.components));
-        in "${pkgs.gnome3.gnome-keyring}/bin/gnome-keyring-daemon ${args}";
+        in "${pkgs.gnome.gnome-keyring}/bin/gnome-keyring-daemon ${args}";
         Restart = "on-abort";
       };
 

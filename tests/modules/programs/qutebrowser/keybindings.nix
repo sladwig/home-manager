@@ -18,15 +18,16 @@ with lib;
       };
     };
 
-    nixpkgs.overlays = [
-      (self: super: {
-        qutebrowser = pkgs.writeScriptBin "dummy-qutebrowser" "";
-      })
-    ];
+    test.stubs.qutebrowser = { };
 
-    nmt.script = ''
+    nmt.script = let
+      qutebrowserConfig = if pkgs.stdenv.hostPlatform.isDarwin then
+        ".qutebrowser/config.py"
+      else
+        ".config/qutebrowser/config.py";
+    in ''
       assertFileContent \
-        home-files/.config/qutebrowser/config.py \
+        home-files/${qutebrowserConfig} \
         ${
           pkgs.writeText "qutebrowser-expected-config.py" ''
             config.load_autoconfig(False)

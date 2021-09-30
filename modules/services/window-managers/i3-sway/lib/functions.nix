@@ -4,9 +4,21 @@ with lib;
 
 rec {
   criteriaStr = criteria:
-    "[${
-      concatStringsSep " " (mapAttrsToList (k: v: ''${k}="${v}"'') criteria)
-    }]";
+    let
+      toCriteria = k: v:
+        if builtins.isBool v then
+          (if v then "${k}" else "")
+        else
+          ''${k}="${v}"'';
+    in "[${concatStringsSep " " (mapAttrsToList toCriteria criteria)}]";
+
+  keybindingDefaultWorkspace = filterAttrs (n: v:
+    cfg.config.defaultWorkspace != null && v == cfg.config.defaultWorkspace)
+    cfg.config.keybindings;
+
+  keybindingsRest = filterAttrs (n: v:
+    cfg.config.defaultWorkspace == null || v != cfg.config.defaultWorkspace)
+    cfg.config.keybindings;
 
   keybindingsStr = { keybindings, bindsymArgs ? "" }:
     concatStringsSep "\n" (mapAttrsToList (keycomb: action:
@@ -29,15 +41,35 @@ rec {
     ];
   barColorSetStr = c: concatStringsSep " " [ c.border c.background c.text ];
 
-  modeStr = name: keybindings: ''
+  modeStr = bindkeysToCode: name: keybindings: ''
     mode "${name}" {
-    ${keybindingsStr { inherit keybindings; }}
+    ${keybindingsStr {
+      inherit keybindings;
+      bindsymArgs = lib.optionalString bindkeysToCode "--to-code";
+    }}
     }
   '';
 
   assignStr = workspace: criteria:
     concatStringsSep "\n"
     (map (c: "assign ${criteriaStr c} ${workspace}") criteria);
+
+  fontConfigStr = let
+    toFontStr = { names, style ? "", size ? "" }:
+      optionalString (names != [ ]) concatStringsSep " " (filter (x: x != "") [
+        "font"
+        "pango:${concatStringsSep ", " names}"
+        style
+        size
+      ]);
+  in fontCfg:
+  if isList fontCfg then
+    toFontStr { names = fontCfg; }
+  else
+    toFontStr {
+      inherit (fontCfg) names style;
+      size = toString fontCfg.size;
+    };
 
   barStr = { id, fonts, mode, hiddenState, position, workspaceButtons
     , workspaceNumbers, command, statusCommand, colors, trayOutput, extraConfig
@@ -46,10 +78,7 @@ rec {
     in ''
       bar {
         ${optionalString (id != null) "id ${id}"}
-        ${
-          optionalString (fonts != [ ])
-          "font pango:${concatStringsSep ", " fonts}"
-        }
+        ${fontConfigStr fonts}
         ${optionalString (mode != null) "mode ${mode}"}
         ${optionalString (hiddenState != null) "hidden_state ${hiddenState}"}
         ${optionalString (position != null) "position ${position}"}
@@ -79,6 +108,18 @@ rec {
           ${
             optionalString (colors.separator != null)
             "separator ${colors.separator}"
+          }
+          ${
+            optionalString (colors.focusedBackground != null)
+            "focused_background ${colors.focusedBackground}"
+          }
+          ${
+            optionalString (colors.focusedStatusline != null)
+            "focused_statusline ${colors.focusedStatusline}"
+          }
+          ${
+            optionalString (colors.focusedSeparator != null)
+            "focused_separator ${colors.focusedSeparator}"
           }
           ${
             optionalString (colors.focusedWorkspace != null)
@@ -120,8 +161,19 @@ rec {
     ${optionalString (smartBorders != "off") "smart_borders ${smartBorders}"}
   '';
 
+  windowBorderString = window: floating:
+    let
+      titlebarString = { titlebar, border, ... }:
+        "${if titlebar then "normal" else "pixel"} ${toString border}";
+    in concatStringsSep "\n" [
+      "default_border ${titlebarString window}"
+      "default_floating_border ${titlebarString floating}"
+    ];
+
   floatingCriteriaStr = criteria:
     "for_window ${criteriaStr criteria} floating enable";
   windowCommandsStr = { command, criteria, ... }:
     "for_window ${criteriaStr criteria} ${command}";
+  workspaceOutputStr = item:
+    ''workspace "${item.workspace}" output ${item.output}'';
 }

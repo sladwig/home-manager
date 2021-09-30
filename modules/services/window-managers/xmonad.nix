@@ -73,6 +73,11 @@ in {
           an absolute path or <literal>null</literal> in which case
           <filename>~/.xmonad/xmonad.hs</filename> will not be managed
           by Home Manager.
+          </para>
+          <para>
+          If this option is set to a non-<literal>null</literal> value,
+          recompilation of xmonad outside of Home Manager (e.g. via
+          <command>xmonad --recompile</command>) will fail.
         '';
       };
 
@@ -133,28 +138,35 @@ in {
 
   in mkIf cfg.enable (mkMerge [
     {
+      assertions = [
+        (hm.assertions.assertPlatform "xsession.windowManager.xmonad" pkgs
+          platforms.linux)
+      ];
+
       home.packages = [ (lowPrio xmonad) ];
-      xsession.windowManager.command = xmonadBin;
+
+      home.file = mapAttrs' (name: value:
+        attrsets.nameValuePair (".xmonad/lib/" + name) { source = value; })
+        cfg.libFiles;
     }
 
+    (mkIf (cfg.config == null) {
+      xsession.windowManager.command = "${xmonad}/bin/xmonad";
+    })
+
     (mkIf (cfg.config != null) {
+      xsession.windowManager.command = xmonadBin;
       home.file.".xmonad/xmonad.hs".source = cfg.config;
       home.file.".xmonad/xmonad-${pkgs.hostPlatform.system}" = {
         source = xmonadBin;
         onChange = ''
           # Attempt to restart xmonad if X is running.
-          if [[ -v DISPLAY ]] ; then
-            echo "Restarting xmonad"
-            $DRY_RUN_CMD ${config.xsession.windowManager.command} --restart
+          if [[ -v DISPLAY ]]; then
+            ${config.xsession.windowManager.command} --restart
           fi
         '';
       };
     })
 
-    {
-      home.file = mapAttrs' (name: value:
-        attrsets.nameValuePair (".xmonad/lib/" + name) { source = value; })
-        cfg.libFiles;
-    }
   ]);
 }

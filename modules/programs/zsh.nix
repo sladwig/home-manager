@@ -56,8 +56,22 @@ let
         default = if versionAtLeast stateVersion "20.03"
           then "$HOME/.zsh_history"
           else relToDotDir ".zsh_history";
+        defaultText = literalExample ''
+          "$HOME/.zsh_history" if state version ≥ 20.03,
+          "$ZDOTDIR/.zsh_history" otherwise
+        '';
         example = literalExample ''"''${config.xdg.dataHome}/zsh/zsh_history"'';
         description = "History file location";
+      };
+
+      ignorePatterns = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        example = literalExample ''[ "rm *" "pkill *" ]'';
+        description = ''
+          Do not enter command lines into the history list
+          if they match any one of the given shell patterns.
+        '';
       };
 
       ignoreDups = mkOption {
@@ -265,9 +279,20 @@ in
         type = types.bool;
       };
 
+      completionInit = mkOption {
+        default = "autoload -U compinit && compinit";
+        description = "Initialization commands to run when completion is enabled.";
+        type = types.lines;
+      };
+
       enableAutosuggestions = mkOption {
         default = false;
         description = "Enable zsh autosuggestions";
+      };
+
+      enableSyntaxHighlighting = mkOption {
+        default = false;
+        description = "Enable zsh syntax highlighting";
       };
 
       history = mkOption {
@@ -455,11 +480,15 @@ in
         # calling it twice causes slight start up slowdown
         # as all $fpath entries will be traversed again.
         ${optionalString (cfg.enableCompletion && !cfg.oh-my-zsh.enable && !cfg.prezto.enable)
-          "autoload -U compinit && compinit"
+          cfg.completionInit
         }
 
         ${optionalString cfg.enableAutosuggestions
           "source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        }
+
+        ${optionalString cfg.enableSyntaxHighlighting
+          "source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
         }
 
         # Environment variables
@@ -486,7 +515,7 @@ in
             (builtins.readFile "${pkgs.zsh-prezto}/share/zsh-prezto/runcoms/zshrc")}
 
         ${concatStrings (map (plugin: ''
-          if [ -f "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}" ]; then
+          if [[ -f "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}" ]]; then
             source "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}"
           fi
         '') cfg.plugins)}
@@ -495,6 +524,7 @@ in
         # See https://github.com/nix-community/home-manager/issues/177.
         HISTSIZE="${toString cfg.history.size}"
         SAVEHIST="${toString cfg.history.save}"
+        ${optionalString (cfg.history.ignorePatterns != []) "HISTORY_IGNORE=${lib.escapeShellArg "(${lib.concatStringsSep "|" cfg.history.ignorePatterns})"}"}
         ${if versionAtLeast config.home.stateVersion "20.03"
           then ''HISTFILE="${cfg.history.path}"''
           else ''HISTFILE="$HOME/${cfg.history.path}"''}

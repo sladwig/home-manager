@@ -13,17 +13,18 @@ in {
   options = { services.flameshot = { enable = mkEnableOption "Flameshot"; }; };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.flameshot" pkgs
+        lib.platforms.linux)
+    ];
+
     home.packages = [ package ];
 
     systemd.user.services.flameshot = {
       Unit = {
         Description = "Flameshot screenshot tool";
-        After = [
-          "graphical-session-pre.target"
-          "polybar.service"
-          "stalonetray.service"
-          "taffybar.service"
-        ];
+        Requires = [ "tray.target" ];
+        After = [ "graphical-session-pre.target" "tray.target" ];
         PartOf = [ "graphical-session.target" ];
       };
 
@@ -33,6 +34,15 @@ in {
         Environment = "PATH=${config.home.profileDirectory}/bin";
         ExecStart = "${package}/bin/flameshot";
         Restart = "on-abort";
+
+        # Sandboxing.
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        NoNewPrivileges = true;
+        PrivateUsers = true;
+        RestrictNamespaces = true;
+        SystemCallArchitectures = "native";
+        SystemCallFilter = "@system-service";
       };
     };
   };

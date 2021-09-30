@@ -6,13 +6,7 @@ let
 
   cfg = config.programs.neovim;
 
-  extraPythonPackageType = mkOptionType {
-    name = "extra-python-packages";
-    description = "python packages in python.withPackages format";
-    check = with types;
-      (x: if isFunction x then isList (x pkgs.pythonPackages) else false);
-    merge = mergeOneOption;
-  };
+  jsonFormat = pkgs.formats.json { };
 
   extraPython3PackageType = mkOptionType {
     name = "extra-python3-packages";
@@ -59,14 +53,20 @@ let
         (map (x: if x ? plugin && x.optional == true then x.plugin else null)
           cfg.plugins);
     };
-    customRC = cfg.extraConfig
-      + pkgs.lib.concatMapStrings pluginConfig cfg.plugins;
+    beforePlugins = "";
   };
 
   extraMakeWrapperArgs = lib.optionalString (cfg.extraPackages != [ ])
     ''--suffix PATH : "${lib.makeBinPath cfg.extraPackages}"'';
 
 in {
+  imports = [
+    (mkRemovedOptionModule [ "programs" "neovim" "withPython" ]
+      "Python2 support has been removed from neovim.")
+    (mkRemovedOptionModule [ "programs" "neovim" "extraPythonPackages" ]
+      "Python2 support has been removed from neovim.")
+  ];
+
   options = {
     programs.neovim = {
       enable = mkEnableOption "Neovim";
@@ -104,26 +104,6 @@ in {
         '';
       };
 
-      withPython = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Enable Python 2 provider. Set to <literal>true</literal> to
-          use Python 2 plugins.
-        '';
-      };
-
-      extraPythonPackages = mkOption {
-        type = with types; either extraPythonPackageType (listOf package);
-        default = (_: [ ]);
-        defaultText = "ps: []";
-        example = literalExample "(ps: with ps; [ pandas jedi ])";
-        description = ''
-          A function in python.withPackages format, which returns a
-          list of Python 2 packages required for your plugins to work.
-        '';
-      };
-
       withRuby = mkOption {
         type = types.nullOr types.bool;
         default = true;
@@ -149,6 +129,15 @@ in {
         description = ''
           A function in python.withPackages format, which returns a
           list of Python 3 packages required for your plugins to work.
+        '';
+      };
+
+      generatedConfigViml = mkOption {
+        type = types.lines;
+        visible = true;
+        readOnly = true;
+        description = ''
+          Generated vimscript config.
         '';
       };
 
@@ -239,16 +228,55 @@ in {
           This option is mutually exclusive with <varname>configure</varname>.
         '';
       };
+
+      coc = {
+        enable = mkEnableOption "Coc";
+
+        settings = mkOption {
+          type = jsonFormat.type;
+          default = { };
+          example = literalExample ''
+            {
+              "suggest.noselect" = true;
+              "suggest.enablePreview" = true;
+              "suggest.enablePreselect" = false;
+              "suggest.disableKind" = true;
+              languageserver = {
+                haskell = {
+                  command = "haskell-language-server-wrapper";
+                  args = [ "--lsp" ];
+                  rootPatterns = [
+                    "*.cabal"
+                    "stack.yaml"
+                    "cabal.project"
+                    "package.yaml"
+                    "hie.yaml"
+                  ];
+                  filetypes = [ "haskell" "lhaskell" ];
+                };
+              };
+            };
+          '';
+          description = ''
+            Extra configuration lines to add to
+            <filename>$XDG_CONFIG_HOME/nvim/coc-settings.json</filename>
+            See
+            <link xlink:href="https://github.com/neoclide/coc.nvim/wiki/Using-the-configuration-file" />
+            for options.
+          '';
+        };
+      };
     };
   };
 
   config = let
     neovimConfig = pkgs.neovimUtils.makeNeovimConfig {
       inherit (cfg)
-        extraPython3Packages withPython3 extraPythonPackages withPython
-        withNodeJs withRuby viAlias vimAlias;
+        extraPython3Packages withPython3 withNodeJs withRuby viAlias vimAlias;
       configure = cfg.configure // moduleConfigure;
-      plugins = cfg.plugins;
+      plugins = cfg.plugins
+        ++ optionals cfg.coc.enable [ pkgs.vimPlugins.coc-nvim ];
+      customRC = cfg.extraConfig;
     };
 
   in mkIf cfg.enable {
@@ -261,13 +289,22 @@ in {
         configure.customRC -> programs.neovim.extraConfig
     '';
 
+    programs.neovim.generatedConfigViml = neovimConfig.neovimRcContent;
+
     home.packages = [ cfg.finalPackage ];
 
-    xdg.configFile."nvim/init.vim".text = neovimConfig.neovimRcContent;
+    xdg.configFile."nvim/init.vim" = mkIf (neovimConfig.neovimRcContent != "") {
+      text = neovimConfig.neovimRcContent;
+    };
+    xdg.configFile."nvim/coc-settings.json" = mkIf cfg.coc.enable {
+      source = jsonFormat.generate "coc-settings.json" cfg.coc.settings;
+    };
+
     programs.neovim.finalPackage = pkgs.wrapNeovimUnstable cfg.package
       (neovimConfig // {
         wrapperArgs = (lib.escapeShellArgs neovimConfig.wrapperArgs) + " "
           + extraMakeWrapperArgs;
+        wrapRc = false;
       });
 
     programs.bash.shellAliases = mkIf cfg.vimdiffAlias { vimdiff = "nvim -d"; };

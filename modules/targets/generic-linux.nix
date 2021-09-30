@@ -4,9 +4,19 @@ with lib;
 
 let
 
+  cfg = config.targets.genericLinux;
+
   profileDirectory = config.home.profileDirectory;
 
 in {
+  imports = [
+    (mkRenamedOptionModule [ "targets" "genericLinux" "extraXdgDataDirs" ] [
+      "xdg"
+      "systemDirs"
+      "data"
+    ])
+  ];
+
   options.targets.genericLinux = {
     enable = mkEnableOption "" // {
       description = ''
@@ -14,39 +24,24 @@ in {
         GNU/Linux distributions other than NixOS.
       '';
     };
-
-    extraXdgDataDirs = mkOption {
-      type = types.listOf types.str;
-      default = [ ];
-      example = [ "/usr/share" "/usr/local/share" ];
-      description = ''
-        List of directory names to add to <envar>XDG_DATA_DIRS</envar>.
-      '';
-    };
   };
 
-  config = mkIf config.targets.genericLinux.enable {
-    home.sessionVariables = let
-      profiles =
-        [ "\${NIX_STATE_DIR:-/nix/var/nix}/profiles/default" profileDirectory ];
-      dataDirs = concatStringsSep ":"
-        (map (profile: "${profile}/share") profiles
-          ++ config.targets.genericLinux.extraXdgDataDirs);
+  config = mkIf cfg.enable {
+    assertions = [
+      (hm.assertions.assertPlatform "targets.genericLinux" pkgs platforms.linux)
+    ];
 
-      # https://github.com/archlinux/svntogit-packages/blob/packages/ncurses/trunk/PKGBUILD
-      # https://salsa.debian.org/debian/ncurses/-/blob/master/debian/rules
-      # https://src.fedoraproject.org/rpms/ncurses/blob/main/f/ncurses.spec
-      # https://gitweb.gentoo.org/repo/gentoo.git/tree/sys-libs/ncurses/ncurses-6.2-r1.ebuild
-      distroTerminfoDirs = concatStringsSep ":" [
-        "/etc/terminfo" # debian, fedora, gentoo
-        "/lib/terminfo" # debian
-        "/usr/share/terminfo" # package default, all distros
-      ];
-    in {
-      XDG_DATA_DIRS = "${dataDirs}\${XDG_DATA_DIRS:+:}$XDG_DATA_DIRS";
-      TERMINFO_DIRS =
-        "${profileDirectory}/share/terminfo:$TERMINFO_DIRS\${TERMINFO_DIRS:+:}${distroTerminfoDirs}";
-    };
+    xdg.systemDirs.data = [
+      # Nix profiles
+      "\${NIX_STATE_DIR:-/nix/var/nix}/profiles/default/share"
+      "${profileDirectory}/share"
+
+      # Distribution-specific
+      "/usr/share/ubuntu"
+      "/usr/local/share"
+      "/usr/share"
+      "/var/lib/snapd/desktop"
+    ];
 
     home.sessionVariablesExtra = ''
       . "${pkgs.nix}/etc/profile.d/nix.sh"
@@ -62,8 +57,38 @@ in {
       . "${profileDirectory}/etc/profile.d/hm-session-vars.sh"
     '';
 
-    systemd.user.sessionVariables = {
+    programs.zsh.envExtra = ''
+      # Make system functions available to zsh
+      () {
+        setopt LOCAL_OPTIONS CASE_GLOB EXTENDED_GLOB
+
+        local system_fpaths=(
+            # Package default
+            /usr/share/zsh/site-functions(/-N)
+
+            # Debian
+            /usr/share/zsh/functions/**/*(/-N)
+            /usr/share/zsh/vendor-completions/(/-N)
+            /usr/share/zsh/vendor-functions/(/-N)
+        )
+        fpath=(''${fpath} ''${system_fpaths})
+      }
+    '';
+
+    systemd.user.sessionVariables = let
+      # https://github.com/archlinux/svntogit-packages/blob/packages/ncurses/trunk/PKGBUILD
+      # https://salsa.debian.org/debian/ncurses/-/blob/master/debian/rules
+      # https://src.fedoraproject.org/rpms/ncurses/blob/main/f/ncurses.spec
+      # https://gitweb.gentoo.org/repo/gentoo.git/tree/sys-libs/ncurses/ncurses-6.2-r1.ebuild
+      distroTerminfoDirs = concatStringsSep ":" [
+        "/etc/terminfo" # debian, fedora, gentoo
+        "/lib/terminfo" # debian
+        "/usr/share/terminfo" # package default, all distros
+      ];
+    in {
       NIX_PATH = "$HOME/.nix-defexpr/channels\${NIX_PATH:+:}$NIX_PATH";
+      TERMINFO_DIRS =
+        "${profileDirectory}/share/terminfo:$TERMINFO_DIRS\${TERMINFO_DIRS:+:}${distroTerminfoDirs}";
     };
   };
 }

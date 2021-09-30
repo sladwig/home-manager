@@ -7,6 +7,8 @@ _arguments \
   '-I[search path]:PATH:_files -/' \
   '-b[backup files]:EXT:()' \
   '--cores[cores]:NUM:()' \
+  '--debug[debug]' \
+  '--impure[impure]' \
   '--keep-failed[keep failed]' \
   '--keep-going[keep going]' \
   '(-h --help)'{--help,-h}'[help]' \
@@ -15,6 +17,7 @@ _arguments \
   '(-f --file)'{--file,-f}'[configuration file]:FILE:_files' \
   '(-j --max-jobs)'{--max-jobs,-j}'[max jobs]:NUM:()' \
   '--option[option]:NAME VALUE:()' \
+  '--builders[builders]:SPEC:()' \
   '--show-trace[show trace]' \
   '1: :->cmds' \
   '*:: :->args' && ret=0
@@ -24,6 +27,7 @@ case "$state" in
     _values 'command' \
       'help[help]' \
       'edit[edit]' \
+      'option[inspect option]' \
       'build[build]' \
       'switch[switch]' \
       'generations[list generations]' \
@@ -42,11 +46,17 @@ case "$state" in
       build|switch)
         _arguments \
           '--cores[cores]:NUM:()' \
+          '--debug[debug]' \
+          '--impure[impure]' \
           '--keep-failed[keep failed]' \
           '--keep-going[keep going]' \
           '--max-jobs[max jobs]:NUM:()' \
+          '--no-out-link[no out link]' \
+          '--no-substitute[no substitute]' \
           '--option[option]:NAME VALUE:()' \
-          '--show-trace[show trace]'
+          '--show-trace[show trace]' \
+          '--substitute[substitute]' \
+          '--builders[builders]:SPEC:()'
         ;;
     esac
 esac

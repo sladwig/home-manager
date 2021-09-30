@@ -146,6 +146,26 @@ in {
       description = ''
         List of profiles.
       '';
+      example = literalExample ''
+        undocked = {
+          outputs = [
+            {
+              criteria = "eDP-1";
+            }
+          ];
+        };
+        docked = {
+          outputs = [
+            {
+              criteria = "eDP-1";
+            }
+            {
+              criteria = "Some Company ASDF 4242";
+              transform = "90";
+            }
+          ];
+        };
+      '';
     };
 
     extraConfig = mkOption {
@@ -167,6 +187,10 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.kanshi" pkgs
+        lib.platforms.linux)
+    ];
 
     xdg.configFile."kanshi/config".text = ''
       ${concatStringsSep "\n" (mapAttrsToList profileStr cfg.profiles)}

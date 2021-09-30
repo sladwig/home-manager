@@ -61,8 +61,13 @@ let
   signModule = types.submodule {
     options = {
       key = mkOption {
-        type = types.str;
-        description = "The default GPG signing key fingerprint.";
+        type = types.nullOr types.str;
+        description = ''
+          The default GPG signing key fingerprint.
+          </para><para>
+          Set to <literal>null</literal> to let GnuPG decide what signing key
+          to use depending on commit’s author.
+        '';
       };
 
       signByDefault = mkOption {
@@ -103,8 +108,26 @@ let
       contents = mkOption {
         type = types.attrsOf types.anything;
         default = { };
+        example = literalExample ''
+          {
+            user = {
+              email = "bob@work.example.com";
+              name = "Bob Work";
+              signingKey = "1A2B3C4D5E6F7G8H";
+            };
+            commit = {
+              gpgSign = true;
+            };
+          };
+        '';
         description = ''
           Configuration to include. If empty then a path must be given.
+
+          This follows the configuration structure as described in
+          <citerefentry>
+            <refentrytitle>git-config</refentrytitle>
+            <manvolnum>1</manvolnum>
+          </citerefentry>.
         '';
       };
     };
@@ -290,7 +313,8 @@ in {
                   "ssl")
               else
                 "";
-              smtpSslCertPath = mkIf smtp.tls.enable smtp.tls.certificatesFile;
+              smtpSslCertPath =
+                mkIf smtp.tls.enable (toString smtp.tls.certificatesFile);
               smtpServer = smtp.host;
               smtpUser = userName;
               from = address;
@@ -303,7 +327,7 @@ in {
 
     (mkIf (cfg.signing != null) {
       programs.git.iniContent = {
-        user.signingKey = cfg.signing.key;
+        user.signingKey = mkIf (cfg.signing.key != null) cfg.signing.key;
         commit.gpgSign = cfg.signing.signByDefault;
         gpg.program = cfg.signing.gpgPath;
       };

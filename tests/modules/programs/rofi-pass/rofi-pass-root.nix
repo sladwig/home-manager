@@ -13,9 +13,10 @@ with lib;
       };
     };
 
-    nixpkgs.overlays = [
-      (self: super: { rofi-pass = pkgs.writeScriptBin "dummy-rofi-pass" ""; })
-    ];
+    test.stubs = {
+      rofi = { };
+      rofi-pass = { };
+    };
 
     nmt.script = ''
       assertFileContent \

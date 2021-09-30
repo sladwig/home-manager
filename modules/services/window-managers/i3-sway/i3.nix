@@ -17,7 +17,7 @@ let
       inherit (commonOptions)
         fonts window floating focus assigns modifier workspaceLayout
         workspaceAutoBackAndForth keycodebindings colors bars startup gaps menu
-        terminal;
+        terminal defaultWorkspace workspaceOutputAssign;
 
       keybindings = mkOption {
         type = types.attrsOf (types.nullOr types.str);
@@ -140,7 +140,8 @@ let
 
   inherit (commonFunctions)
     keybindingsStr keycodebindingsStr modeStr assignStr barStr gapsStr
-    floatingCriteriaStr windowCommandsStr colorSetStr;
+    floatingCriteriaStr windowCommandsStr colorSetStr windowBorderString
+    fontConfigStr keybindingDefaultWorkspace keybindingsRest workspaceOutputStr;
 
   startupEntryStr = { command, always, notification, workspace, ... }: ''
     ${if always then "exec_always" else "exec"} ${
@@ -155,14 +156,9 @@ let
 
   configFile = pkgs.writeText "i3.conf" ((if cfg.config != null then
     with cfg.config; ''
-      font pango:${concatStringsSep ", " fonts}
+      ${fontConfigStr fonts}
       floating_modifier ${floating.modifier}
-      new_window ${if window.titlebar then "normal" else "pixel"} ${
-        toString window.border
-      }
-      new_float ${if floating.titlebar then "normal" else "pixel"} ${
-        toString floating.border
-      }
+      ${windowBorderString window floating}
       hide_edge_borders ${window.hideEdgeBorders}
       force_focus_wrapping ${if focus.forceWrapping then "yes" else "no"}
       focus_follows_mouse ${if focus.followMouse then "yes" else "no"}
@@ -180,15 +176,17 @@ let
       client.placeholder ${colorSetStr colors.placeholder}
       client.background ${colors.background}
 
-      ${keybindingsStr { inherit keybindings; }}
+      ${keybindingsStr { keybindings = keybindingDefaultWorkspace; }}
+      ${keybindingsStr { keybindings = keybindingsRest; }}
       ${keycodebindingsStr keycodebindings}
-      ${concatStringsSep "\n" (mapAttrsToList modeStr modes)}
+      ${concatStringsSep "\n" (mapAttrsToList (modeStr false) modes)}
       ${concatStringsSep "\n" (mapAttrsToList assignStr assigns)}
       ${concatStringsSep "\n" (map barStr bars)}
       ${optionalString (gaps != null) gapsStr}
       ${concatStringsSep "\n" (map floatingCriteriaStr floating.criteria)}
       ${concatStringsSep "\n" (map windowCommandsStr window.commands)}
       ${concatStringsSep "\n" (map startupEntryStr startup)}
+      ${concatStringsSep "\n" (map workspaceOutputStr workspaceOutputAssign)}
     ''
   else
     "") + "\n" + cfg.extraConfig);
@@ -209,6 +207,8 @@ let
     '';
 
 in {
+  meta.maintainers = with maintainers; [ sumnerevans ];
+
   options = {
     xsession.windowManager.i3 = {
       enable = mkEnableOption "i3 window manager.";
@@ -241,15 +241,21 @@ in {
 
   config = mkIf cfg.enable (mkMerge [
     {
+      assertions = [
+        (hm.assertions.assertPlatform "xsession.windowManager.i3" pkgs
+          platforms.linux)
+      ];
+
       home.packages = [ cfg.package ];
+
       xsession.windowManager.command = "${cfg.package}/bin/i3";
+
       xdg.configFile."i3/config" = {
         source = checkI3Config;
         onChange = ''
           i3Socket=''${XDG_RUNTIME_DIR:-/run/user/$UID}/i3/ipc-socket.*
           if [ -S $i3Socket ]; then
-            echo "Reloading i3"
-            $DRY_RUN_CMD ${cfg.package}/bin/i3-msg -s $i3Socket reload 1>/dev/null
+            ${cfg.package}/bin/i3-msg -s $i3Socket reload >/dev/null
           fi
         '';
       };
@@ -258,6 +264,15 @@ in {
     (mkIf (cfg.config != null) {
       xsession.windowManager.i3.package =
         mkDefault (if (cfg.config.gaps != null) then pkgs.i3-gaps else pkgs.i3);
+    })
+
+    (mkIf (cfg.config != null) {
+      warnings = (optional (isList cfg.config.fonts)
+        "Specifying i3.config.fonts as a list is deprecated. Use the attrset version instead.")
+        ++ flatten (map (b:
+          optional (isList b.fonts)
+          "Specifying i3.config.bars[].fonts as a list is deprecated. Use the attrset version instead.")
+          cfg.config.bars);
     })
 
     (mkIf (cfg.config != null

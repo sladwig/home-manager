@@ -71,6 +71,8 @@ in rec {
 
   inherit type typeOf;
 
+  isGVariant = v: v._type or "" == "gvariant";
+
   isArray = hasPrefix "a";
   isMaybe = hasPrefix "m";
   isTuple = hasPrefix "(";
@@ -122,8 +124,9 @@ in rec {
     };
 
   mkString = v:
-    mkPrimitive type.string v // {
-      __toString = self: "'${escape [ "'" "\\" ] self.value}'";
+    let sanitize = s: replaceStrings [ "\n" ] [ "\\n" ] (escape [ "'" "\\" ] s);
+    in mkPrimitive type.string v // {
+      __toString = self: "'${sanitize self.value}'";
     };
 
   mkObjectpath = v:

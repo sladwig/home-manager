@@ -26,6 +26,8 @@ let
         Type = "oneshot";
         ExecStart = "${pkgs.gmailieer}/bin/gmi sync";
         WorkingDirectory = account.maildir.absPath;
+        Environment =
+          "NOTMUCH_CONFIG=${config.xdg.configHome}/notmuch/notmuchrc";
       };
     };
   };
@@ -49,16 +51,15 @@ let
 in {
   meta.maintainers = [ maintainers.tadfisher ];
 
-  options = {
-    services.lieer.enable =
-      mkEnableOption "lieer Gmail synchronization service";
-
-    accounts.email.accounts = mkOption {
-      type = with types; attrsOf (submodule (import ./lieer-accounts.nix));
-    };
-  };
+  options.services.lieer.enable =
+    mkEnableOption "lieer Gmail synchronization service";
 
   config = mkIf cfg.enable {
+    assertions = [
+      (lib.hm.assertions.assertPlatform "services.lieer" pkgs
+        lib.platforms.linux)
+    ];
+
     programs.lieer.enable = true;
     systemd.user.services = listToAttrs (map serviceUnit syncAccounts);
     systemd.user.timers = listToAttrs (map timerUnit syncAccounts);

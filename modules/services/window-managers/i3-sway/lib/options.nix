@@ -7,14 +7,37 @@ let
   isI3 = moduleName == "i3";
   isSway = !isI3;
 
-  fonts = mkOption {
-    type = types.listOf types.str;
-    default = [ "monospace 8" ];
-    description = ''
-      Font list used for window titles. Only FreeType fonts are supported.
-      The order here is important (e.g. icons font should go before the one used for text).
-    '';
-    example = [ "FontAwesome 10" "Terminus 10" ];
+  fontOptions = types.submodule {
+    options = {
+      names = mkOption {
+        type = types.listOf types.str;
+        default = [ "monospace" ];
+        defaultText = literalExample ''[ "monospace" ]'';
+        description = ''
+          List of font names list used for window titles. Only FreeType fonts are supported.
+          The order here is important (e.g. icons font should go before the one used for text).
+        '';
+        example = literalExample ''[ "FontAwesome" "Terminus" ]'';
+      };
+
+      style = mkOption {
+        type = types.str;
+        default = "";
+        description = ''
+          The font style to use for window titles.
+        '';
+        example = "Bold Semi-Condensed";
+      };
+
+      size = mkOption {
+        type = types.float;
+        default = 8.0;
+        description = ''
+          The font size to use for window titles.
+        '';
+        example = 11.5;
+      };
+    };
   };
 
   startupModule = types.submodule {
@@ -56,20 +79,27 @@ let
     options = let
       versionAtLeast2009 = versionAtLeast config.home.stateVersion "20.09";
       mkNullableOption = { type, default, ... }@args:
-        mkOption (args // optionalAttrs versionAtLeast2009 {
+        mkOption (args // {
           type = types.nullOr type;
-          default = null;
-          example = default;
-        } // {
+          default = if versionAtLeast2009 then null else default;
           defaultText = literalExample ''
-            ${
-              if isString default then default else "See code"
-            } for state version < 20.09,
-            null for state version ≥ 20.09
+            null for state version ≥ 20.09, as example otherwise
           '';
+          example = default;
         });
     in {
-      fonts = fonts // optionalAttrs versionAtLeast2009 { default = [ ]; };
+      fonts = mkOption {
+        type = with types; either (listOf str) fontOptions;
+        default = { };
+        example = literalExample ''
+          {
+            names = [ "DejaVu Sans Mono" "FontAwesome5Free" ];
+            style = "Bold Semi-Condensed";
+            size = 11.0;
+          }
+        '';
+        description = "Font configuration for this bar.";
+      };
 
       extraConfig = mkOption {
         type = types.lines;
@@ -133,11 +163,9 @@ let
           "\${pkgs.waybar}/bin/waybar";
       };
 
-      statusCommand = mkOption {
-        type = types.nullOr types.str;
-        default =
-          if versionAtLeast2009 then null else "${pkgs.i3status}/bin/i3status";
-        example = "i3status";
+      statusCommand = mkNullableOption {
+        type = types.str;
+        default = "${pkgs.i3status}/bin/i3status";
         description = "Command that will be used to get status lines.";
       };
 
@@ -160,6 +188,30 @@ let
               type = types.str;
               default = "#666666";
               description = "Text color to be used for the separator.";
+            };
+
+            focusedBackground = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description =
+                "Background color of the bar on the currently focused monitor output.";
+              example = "#000000";
+            };
+
+            focusedStatusline = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description =
+                "Text color to be used for the statusline on the currently focused monitor output.";
+              example = "#ffffff";
+            };
+
+            focusedSeparator = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description =
+                "Text color to be used for the separator on the currently focused monitor output.";
+              example = "#666666";
             };
 
             focusedWorkspace = mkNullableOption {
@@ -301,16 +353,36 @@ let
 
       criteria = mkOption {
         type = criteriaModule;
-        description =
-          "Criteria of the windows on which command should be executed.";
-        example = { title = "x200: ~/work"; };
+        description = ''
+          Criteria of the windows on which command should be executed.
+          </para><para>
+          A value of <literal>true</literal> is equivalent to using an empty
+          criteria (which is different from an empty string criteria).
+        '';
+        example = literalExample ''
+          {
+            title = "x200: ~/work";
+            floating = true;
+          };
+        '';
       };
     };
   };
 
-  criteriaModule = types.attrsOf types.str;
+  criteriaModule = types.attrsOf (types.either types.str types.bool);
 in {
-  inherit fonts;
+  fonts = mkOption {
+    type = with types; either (listOf str) fontOptions;
+    default = { };
+    example = literalExample ''
+      {
+        names = [ "DejaVu Sans Mono" "FontAwesome5Free" ];
+        style = "Bold Semi-Condensed";
+        size = 11.0;
+      }
+    '';
+    description = "Font configuration for window titles, nagbar...";
+  };
 
   window = mkOption {
     type = types.submodule {
@@ -475,7 +547,7 @@ in {
   };
 
   workspaceLayout = mkOption {
-    type = types.enum [ "default" "stacked" "tabbed" ];
+    type = types.enum [ "default" "stacking" "tabbed" ];
     default = "default";
     example = "tabbed";
     description = ''
@@ -605,7 +677,10 @@ in {
       workspaceButtons = true;
       workspaceNumbers = true;
       statusCommand = "${pkgs.i3status}/bin/i3status";
-      fonts = [ "monospace 8" ];
+      fonts = {
+        names = [ "monospace" ];
+        size = 8.0;
+      };
       trayOutput = "primary";
       colors = {
         background = "#000000";
@@ -639,6 +714,7 @@ in {
       };
     }] else
       [ { } ];
+    defaultText = literalExample "see code";
     description = ''
       ${capitalModuleName} bars settings blocks. Set to empty list to remove bars completely.
     '';
@@ -775,5 +851,48 @@ in {
       "${pkgs.dmenu}/bin/dmenu_run";
     description = "Default launcher to use.";
     example = "bemenu-run";
+  };
+
+  defaultWorkspace = mkOption {
+    type = types.nullOr types.str;
+    default = null;
+    description = ''
+      The default workspace to show when ${
+        if isSway then "sway" else "i3"
+      } is launched.
+      This must to correspond to the value of the keybinding of the default workspace.
+    '';
+    example = "workspace number 9";
+  };
+
+  workspaceOutputAssign = mkOption {
+    type = with types;
+      let
+        workspaceOutputOpts = submodule {
+          options = {
+            workspace = mkOption {
+              type = str;
+              default = "";
+              example = "Web";
+              description = ''
+                Name of the workspace to assign.
+              '';
+            };
+
+            output = mkOption {
+              type = str;
+              default = "";
+              example = "eDP";
+              description = ''
+                Name of the output from <command>
+                  ${if isSway then "swaymsg" else "i3-msg"} -t get_outputs
+                </command>.
+              '';
+            };
+          };
+        };
+      in listOf workspaceOutputOpts;
+    default = [ ];
+    description = "Assign workspaces to outputs.";
   };
 }

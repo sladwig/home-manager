@@ -18,8 +18,18 @@ in {
         default = ".xsession";
         example = ".xsession-hm";
         description = ''
-          Path, relative <envar>HOME</envar>, where Home Manager
+          Path, relative to <envar>HOME</envar>, where Home Manager
           should write the X session script.
+        '';
+      };
+
+      profilePath = mkOption {
+        type = types.str;
+        default = ".xprofile";
+        example = ".xprofile-hm";
+        description = ''
+          Path, relative to <envar>HOME</envar>, where Home Manager
+          should write the X profile script.
         '';
       };
 
@@ -33,8 +43,13 @@ in {
           in
             "''${xmonad}/bin/xmonad";
         '';
+        default = ''test -n "$1" && eval "$@"'';
         description = ''
-          Window manager start command.
+          Command to use to start the window manager.
+          </para><para>
+          The default value allows integration with NixOS' generated xserver configuration.
+          </para><para>
+          Extra actions and commands can be specified in <option>xsession.initExtra</option>.
         '';
       };
 
@@ -75,6 +90,9 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions =
+      [ (hm.assertions.assertPlatform "xsession" pkgs platforms.linux) ];
+
     xsession.importedVariables = [
       "DBUS_SESSION_BUS_ADDRESS"
       "DISPLAY"
@@ -104,23 +122,32 @@ in {
                 args = optional (layout != null) "-layout '${layout}'"
                   ++ optional (variant != null) "-variant '${variant}'"
                   ++ optional (model != null) "-model '${model}'"
-                  ++ map (v: "-option '${v}'") options;
+                  ++ [ "-option ''" ] ++ map (v: "-option '${v}'") options;
               in "${pkgs.xorg.setxkbmap}/bin/setxkbmap ${toString args}";
           };
         };
       };
 
-      # A basic graphical session target for Home Manager.
-      targets.hm-graphical-session = {
-        Unit = {
-          Description = "Home Manager X session";
-          Requires = [ "graphical-session-pre.target" ];
-          BindsTo = [ "graphical-session.target" ];
+      targets = {
+        # A basic graphical session target for Home Manager.
+        hm-graphical-session = {
+          Unit = {
+            Description = "Home Manager X session";
+            Requires = [ "graphical-session-pre.target" ];
+            BindsTo = [ "graphical-session.target" "tray.target" ];
+          };
+        };
+
+        tray = {
+          Unit = {
+            Description = "Home Manager System Tray";
+            Requires = [ "graphical-session-pre.target" ];
+          };
         };
       };
     };
 
-    home.file.".xprofile".text = ''
+    home.file.${cfg.profilePath}.text = ''
       . "${config.home.profileDirectory}/etc/profile.d/hm-session-vars.sh"
 
       if [ -e "$HOME/.profile" ]; then
@@ -145,7 +172,7 @@ in {
       executable = true;
       text = ''
         if [ -z "$HM_XPROFILE_SOURCED" ]; then
-          . ~/.xprofile
+          . "${config.home.homeDirectory}/${cfg.profilePath}"
         fi
         unset HM_XPROFILE_SOURCED
 
